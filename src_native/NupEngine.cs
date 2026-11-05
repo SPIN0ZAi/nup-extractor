@@ -688,4 +688,9 @@ public static class NupEngine
         using var fs = new FileStream(cleanDest, FileMode.Create, FileAccess.Write, FileShare.None, 131072);
         reader.ExtractFileToStream(fileIndex, fs);
     }
+
+    public static void Pack(PackOptions options, IProgress<PackProgressInfo>? progress = null, CancellationToken ct = default)
+    {
+        NupWriter.Pack(options, progress, ct);
+    }
 }

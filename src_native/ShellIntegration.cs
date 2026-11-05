@@ -72,6 +72,15 @@ public static class ShellIntegration
                 }
             }
 
+            // 3. Folder Context Menu: "Pack to .NUP"
+            using (var dirKey = Registry.CurrentUser.CreateSubKey(@"Software\Classes\Directory\shell\NupExtractor.Pack"))
+            {
+                dirKey.SetValue("", "Pack to .NUP with NUP Extractor");
+                dirKey.SetValue("Icon", $"\"{exePath}\"");
+                using var dirCmd = dirKey.CreateSubKey("command");
+                dirCmd.SetValue("", $"\"{exePath}\" --pack-here \"%1\"");
+            }
+
             return true;
         }
         catch
@@ -86,6 +95,7 @@ public static class ShellIntegration
         {
             Registry.CurrentUser.DeleteSubKeyTree(@"Software\Classes\" + Extension, false);
             Registry.CurrentUser.DeleteSubKeyTree(@"Software\Classes\" + ProgId, false);
+            Registry.CurrentUser.DeleteSubKeyTree(@"Software\Classes\Directory\shell\NupExtractor.Pack", false);
             return true;
         }
         catch

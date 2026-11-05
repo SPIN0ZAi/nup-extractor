@@ -25,6 +25,18 @@
             <span id="app-version-badge" class="badge-tag" style="background: rgba(0, 212, 255, 0.1); border-color: rgba(0, 212, 255, 0.3); color: var(--switch-blue); cursor: pointer;" title="Click to check for updates"></span>
         </div>
 
+        <!-- Mode Navigation (Extract vs Pack) -->
+        <div class="nav-mode-selector">
+            <button id="nav-mode-extract" class="nav-mode-btn active" title="Inspect and extract .NUP containers">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Extract
+            </button>
+            <button id="nav-mode-pack" class="nav-mode-btn" title="Pack game folder into Nintendo Switch .NUP container">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8v13H3V8"></path><path d="M1 3h22v5H1z"></path><path d="M10 12h4"></path></svg>
+                Pack
+            </button>
+        </div>
+
         <div class="header-actions">
             <button id="btn-shell-settings" class="btn btn-secondary" title="Windows Explorer Right-Click Integration">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
@@ -260,6 +272,116 @@
 
         </section>
 
+        <!-- Pack / Build Mode View -->
+        <section id="pack-view" class="pack-view-container" style="display: none;">
+            <div class="pack-grid">
+                <!-- Left: Source Folder Dropzone & Status -->
+                <div class="pack-card">
+                    <h3 class="card-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                        1. Source Game Folder
+                    </h3>
+                    <p style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 1rem;">
+                        Select or drag-and-drop a game dump directory containing <code>romfs</code>, <code>exefs</code>, or game asset files.
+                    </p>
+
+                    <div id="pack-dropzone" class="pack-dropzone">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" style="color: var(--switch-blue); margin-bottom: 0.5rem;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
+                        <div id="pack-dropzone-title" style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary);">
+                            Drop Game Folder Here
+                        </div>
+                        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.25rem;">
+                            or click below to choose folder
+                        </div>
+                        <button id="btn-browse-pack-source" class="btn btn-secondary" style="margin-top: 1rem;">
+                            Browse Game Folder...
+                        </button>
+                    </div>
+
+                    <div id="pack-source-preview" style="display: none; margin-top: 1rem; background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 0.85rem;">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">SELECTED FOLDER</span>
+                            <span id="pack-source-badge" class="badge-tag" style="background: rgba(34, 197, 94, 0.15); color: #22c55e;">Ready to Pack</span>
+                        </div>
+                        <div id="pack-source-path" style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--switch-blue); margin-top: 0.4rem; word-break: break-all;"></div>
+                        <div id="pack-source-detected" style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;"></div>
+                    </div>
+                </div>
+
+                <!-- Right: Container Metadata & Compression Settings -->
+                <div class="pack-card">
+                    <h3 class="card-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                        2. Container Metadata & Compression
+                    </h3>
+
+                    <div style="display: flex; flex-direction: column; gap: 1rem; margin-top: 0.85rem;">
+                        <div class="field-group">
+                            <label class="field-label">Destination .NUP File</label>
+                            <div class="input-with-button">
+                                <input id="pack-dest-input" type="text" class="text-input" placeholder="Select destination output .nup path..." />
+                                <button id="btn-browse-pack-dest" class="btn btn-secondary">Browse...</button>
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                            <div class="field-group">
+                                <label class="field-label">Game Title Name</label>
+                                <input id="pack-title-input" type="text" class="text-input" placeholder="Custom Game / Mod" />
+                            </div>
+                            <div class="field-group">
+                                <label class="field-label">Publisher</label>
+                                <input id="pack-publisher-input" type="text" class="text-input" placeholder="Homebrew / Modder" />
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                            <div class="field-group">
+                                <label class="field-label">Title ID (Hex)</label>
+                                <input id="pack-titleid-input" type="text" class="text-input" placeholder="0100000000001000" />
+                            </div>
+                            <div class="field-group">
+                                <label class="field-label">Display Version</label>
+                                <input id="pack-version-input" type="text" class="text-input" placeholder="1.0.0" />
+                            </div>
+                        </div>
+
+                        <div class="field-group">
+                            <label class="field-label">Compression Codec</label>
+                            <div class="mode-options" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem;">
+                                <label class="radio-card">
+                                    <input type="radio" name="pack-compression" value="3" checked />
+                                    <div class="radio-content">
+                                        <div style="font-weight: 700; font-size: 0.82rem; color: var(--switch-blue);">🚀 Zstd Fast</div>
+                                        <div style="font-size: 0.7rem; color: var(--text-muted);">Level 3 (Balanced)</div>
+                                    </div>
+                                </label>
+                                <label class="radio-card">
+                                    <input type="radio" name="pack-compression" value="19" />
+                                    <div class="radio-content">
+                                        <div style="font-weight: 700; font-size: 0.82rem; color: #a855f7;">🗜️ Zstd Ultra</div>
+                                        <div style="font-size: 0.7rem; color: var(--text-muted);">Level 19 (Max)</div>
+                                    </div>
+                                </label>
+                                <label class="radio-card">
+                                    <input type="radio" name="pack-compression" value="0" />
+                                    <div class="radio-content">
+                                        <div style="font-weight: 700; font-size: 0.82rem; color: var(--text-primary);">⚡ Raw</div>
+                                        <div style="font-size: 0.7rem; color: var(--text-muted);">Uncompressed</div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <button id="btn-start-pack" class="btn btn-primary btn-glow" style="margin-top: 0.5rem; padding: 0.85rem; font-size: 1rem; width: 100%; justify-content: center;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8v13H3V8"></path><path d="M1 3h22v5H1z"></path><path d="M10 12h4"></path></svg>
+                            Build & Pack .NUP Container
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
     </main>
 
     <!-- Extraction Progress Modal -->
@@ -327,6 +449,45 @@
 
             <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
                 <button id="btn-verify-modal-close" class="btn btn-secondary">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Packaging Progress Modal -->
+    <div id="pack-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="progress-header">
+                <div>
+                    <h3 id="pack-modal-title" style="font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+                        <span class="joycon-left" style="height: 18px; width: 8px;"></span>
+                        Building .NUP Container...
+                    </h3>
+                    <p id="pack-current-file" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">Initializing packing engine...</p>
+                </div>
+                <span id="pack-modal-pct" style="font-family: var(--font-mono); font-weight: 700; color: var(--switch-blue);">0%</span>
+            </div>
+
+            <div class="progress-bar-container">
+                <div id="pack-progress-bar" class="progress-fill"></div>
+            </div>
+
+            <div class="progress-stats">
+                <span id="pack-stats-files">0 / 0 files</span>
+                <span id="pack-stats-bytes">0 B / 0 B</span>
+            </div>
+
+            <div class="progress-log-box" id="pack-log-box"></div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button id="btn-pack-modal-open-folder" class="btn btn-secondary" style="display: none;">
+                    Open Output Folder
+                </button>
+                <button id="btn-pack-modal-cancel" class="btn btn-ghost">
+                    Cancel
+                </button>
+                <button id="btn-pack-modal-close" class="btn btn-primary" style="display: none;">
                     Close
                 </button>
             </div>

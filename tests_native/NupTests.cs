@@ -440,6 +440,129 @@ public class NupTests
     }
 
     [Fact]
+    public void Test_NupWriter_PacksFolder_AndCanBeReadBackAccurately()
+    {
+        string tempBase = Path.Combine(Path.GetTempPath(), $"nup_pack_test_{Guid.NewGuid():N}");
+        string sourceDir = Path.Combine(tempBase, "source_game");
+        string outNup = Path.Combine(tempBase, "output_game.nup");
+
+        try
+        {
+            // Prepare folder structure
+            Directory.CreateDirectory(Path.Combine(sourceDir, "exefs"));
+            Directory.CreateDirectory(Path.Combine(sourceDir, "romfs", "data"));
+            Directory.CreateDirectory(Path.Combine(sourceDir, "romfs", "audio"));
+
+            byte[] npdmBytes = Encoding.UTF8.GetBytes("HEADER_NPDM_DATA_1234567890");
+            byte[] subsdkBytes = new byte[4096];
+            Random.Shared.NextBytes(subsdkBytes);
+            string jsonText = "{\"game\":\"test\",\"version\":\"1.0.0\"}";
+            byte[] audioBytes = new byte[8192];
+            for (int i = 0; i < audioBytes.Length; i++) audioBytes[i] = (byte)(i % 256);
+
+            File.WriteAllBytes(Path.Combine(sourceDir, "exefs", "main.npdm"), npdmBytes);
+            File.WriteAllBytes(Path.Combine(sourceDir, "exefs", "subsdk0"), subsdkBytes);
+            File.WriteAllText(Path.Combine(sourceDir, "romfs", "data", "config.json"), jsonText);
+            File.WriteAllBytes(Path.Combine(sourceDir, "romfs", "audio", "bgm.ogg"), audioBytes);
+
+            var options = new PackOptions
+            {
+                SourceDirectory = sourceDir,
+                OutputFilePath = outNup,
+                TitleName = "Chrono Pack Adventure",
+                Publisher = "Antigravity Studios",
+                TitleId = 0x0100ABCD1234EF00UL,
+                VersionString = "2.4.1",
+                CompressionLevel = 3
+            };
+
+            NupWriter.Pack(options);
+
+            Assert.True(File.Exists(outNup));
+            Assert.True(new FileInfo(outNup).Length > 0);
+
+            // Read the generated container back with NupReader
+            using var reader = new NupReader(outNup);
+            Assert.Equal(NupConstants.HeaderSize, reader.Super.HeaderSize);
+            Assert.Equal(1, reader.Super.HeaderVersion);
+            Assert.Equal(1u, reader.Super.PackageCount);
+            Assert.True(reader.Super.FileSize > 0);
+
+            var pkg = reader.Packages[0];
+            Assert.Equal(0x0100ABCD1234EF00UL, pkg.TitleId);
+            Assert.NotEqual(NupConstants.NoDir, pkg.ExeFsDir);
+            Assert.NotEqual(NupConstants.NoDir, pkg.RomFsDir);
+
+            // Verify metadata
+            var meta = reader.GetPackageMetadata(pkg);
+            Assert.True(meta.ContainsKey(NupConstants.TlvTitleName));
+            Assert.Equal("Chrono Pack Adventure", Encoding.UTF8.GetString(meta[NupConstants.TlvTitleName]));
+            Assert.True(meta.ContainsKey(NupConstants.TlvPublisher));
+            Assert.Equal("Antigravity Studios", Encoding.UTF8.GetString(meta[NupConstants.TlvPublisher]));
+            Assert.True(meta.ContainsKey(NupConstants.TlvDisplayVersion));
+            Assert.Equal("2.4.1", Encoding.UTF8.GetString(meta[NupConstants.TlvDisplayVersion]));
+
+            // Verify all files were preserved byte-for-byte
+            Assert.Equal(4, reader.Files.Count);
+
+            var filesMap = new Dictionary<string, byte[]>();
+            for (int i = 0; i < reader.Files.Count; i++)
+            {
+                filesMap[reader.Files[i].Name] = reader.ReadFileData(i);
+            }
+
+            Assert.True(filesMap.ContainsKey("main.npdm"));
+            Assert.Equal(npdmBytes, filesMap["main.npdm"]);
+
+            Assert.True(filesMap.ContainsKey("subsdk0"));
+            Assert.Equal(subsdkBytes, filesMap["subsdk0"]);
+
+            Assert.True(filesMap.ContainsKey("config.json"));
+            Assert.Equal(jsonText, Encoding.UTF8.GetString(filesMap["config.json"]));
+
+            Assert.True(filesMap.ContainsKey("bgm.ogg"));
+            Assert.Equal(audioBytes, filesMap["bgm.ogg"]);
+        }
+        finally
+        {
+            try { if (Directory.Exists(tempBase)) Directory.Delete(tempBase, true); } catch { }
+        }
+    }
+
+    [Fact]
+    public void Test_NupWriter_RawUncompressedMode()
+    {
+        string tempBase = Path.Combine(Path.GetTempPath(), $"nup_pack_raw_{Guid.NewGuid():N}");
+        string sourceDir = Path.Combine(tempBase, "source_raw");
+        string outNup = Path.Combine(tempBase, "output_raw.nup");
+
+        try
+        {
+            Directory.CreateDirectory(sourceDir);
+            byte[] data = Encoding.UTF8.GetBytes("RAW_UNCOMPRESSED_PAYLOAD_TEST");
+            File.WriteAllBytes(Path.Combine(sourceDir, "test.txt"), data);
+
+            var options = new PackOptions
+            {
+                SourceDirectory = sourceDir,
+                OutputFilePath = outNup,
+                CompressionLevel = 0 // Raw
+            };
+
+            NupWriter.Pack(options);
+
+            using var reader = new NupReader(outNup);
+            Assert.Single(reader.Files);
+            Assert.Equal(NupConstants.CodecRaw, reader.Files[0].Codec);
+            Assert.Equal(data, reader.ReadFileData(0));
+        }
+        finally
+        {
+            try { if (Directory.Exists(tempBase)) Directory.Delete(tempBase, true); } catch { }
+        }
+    }
+
+    [Fact]
     public void Test_StaticAssets_JavaScriptSyntaxValidation()
     {
         string jsPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../static/app.js"));

@@ -68,6 +68,12 @@ if (isNative) {
             onUpdateProgress(info);
         } else if (type === "update_error") {
             onUpdateError(msg);
+        } else if (type === "pack_progress" && info) {
+            onPackProgress(info);
+        } else if (type === "pack_done") {
+            onPackDone(msg);
+        } else if (type === "pack_error") {
+            onPackError(msg);
         }
     });
 }
@@ -154,6 +160,41 @@ const shellStatusIndicator = document.getElementById("shell-status-indicator");
 const btnToggleShellIntegration = document.getElementById("btn-toggle-shell-integration");
 const btnCloseShellSettings = document.getElementById("btn-close-shell-settings");
 let isShellRegistered = false;
+
+// Mode Navigation Elements
+const navModeExtract = document.getElementById("nav-mode-extract");
+const navModePack = document.getElementById("nav-mode-pack");
+const packView = document.getElementById("pack-view");
+let activeAppMode = "extract"; // "extract" | "pack"
+
+// Pack Form Elements
+const packDropzone = document.getElementById("pack-dropzone");
+const packDropzoneTitle = document.getElementById("pack-dropzone-title");
+const btnBrowsePackSource = document.getElementById("btn-browse-pack-source");
+const packSourcePreview = document.getElementById("pack-source-preview");
+const packSourcePath = document.getElementById("pack-source-path");
+const packDestInput = document.getElementById("pack-dest-input");
+const btnBrowsePackDest = document.getElementById("btn-browse-pack-dest");
+const packTitleInput = document.getElementById("pack-title-input");
+const packPublisherInput = document.getElementById("pack-publisher-input");
+const packTitleIdInput = document.getElementById("pack-titleid-input");
+const packVersionInput = document.getElementById("pack-version-input");
+const btnStartPack = document.getElementById("btn-start-pack");
+let selectedPackSourceDir = null;
+let lastPackedOutputFile = null;
+
+// Pack Modal Elements
+const packModal = document.getElementById("pack-modal");
+const packModalTitle = document.getElementById("pack-modal-title");
+const packCurrentFile = document.getElementById("pack-current-file");
+const packModalPct = document.getElementById("pack-modal-pct");
+const packProgressBar = document.getElementById("pack-progress-bar");
+const packStatsFiles = document.getElementById("pack-stats-files");
+const packStatsBytes = document.getElementById("pack-stats-bytes");
+const packLogBox = document.getElementById("pack-log-box");
+const btnPackModalOpenFolder = document.getElementById("btn-pack-modal-open-folder");
+const btnPackModalCancel = document.getElementById("btn-pack-modal-cancel");
+const btnPackModalClose = document.getElementById("btn-pack-modal-close");
 
 // Initialization
 document.addEventListener("DOMContentLoaded", () => {
@@ -396,6 +437,75 @@ function setupEventListeners() {
             }
         });
     }
+
+    // Mode Switching
+    if (navModeExtract) {
+        navModeExtract.addEventListener("click", () => switchAppMode("extract"));
+    }
+    if (navModePack) {
+        navModePack.addEventListener("click", () => switchAppMode("pack"));
+    }
+
+    // Pack Source Folder Browse
+    if (btnBrowsePackSource) {
+        btnBrowsePackSource.addEventListener("click", browsePackSourceFolder);
+    }
+
+    // Pack Destination Browse
+    if (btnBrowsePackDest) {
+        btnBrowsePackDest.addEventListener("click", browsePackDestination);
+    }
+
+    // Start Packaging
+    if (btnStartPack) {
+        btnStartPack.addEventListener("click", startPackaging);
+    }
+
+    // Pack Dropzone Events
+    if (packDropzone) {
+        packDropzone.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            packDropzone.classList.add("dragover");
+        });
+        packDropzone.addEventListener("dragleave", () => {
+            packDropzone.classList.remove("dragover");
+        });
+        packDropzone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            packDropzone.classList.remove("dragover");
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                const item = e.dataTransfer.files[0];
+                if (item.path) {
+                    setPackSourceFolder(item.path);
+                }
+            }
+        });
+    }
+
+    // Pack Modal Buttons
+    if (btnPackModalCancel) {
+        btnPackModalCancel.addEventListener("click", () => {
+            if (isNative) {
+                nativeCall("cancel_pack").catch(() => {});
+            }
+            packModal.classList.remove("active");
+        });
+    }
+
+    if (btnPackModalClose) {
+        btnPackModalClose.addEventListener("click", () => {
+            packModal.classList.remove("active");
+        });
+    }
+
+    if (btnPackModalOpenFolder) {
+        btnPackModalOpenFolder.addEventListener("click", () => {
+            if (lastPackedOutputFile) {
+                const folder = lastPackedOutputFile.substring(0, Math.max(lastPackedOutputFile.lastIndexOf("\\"), lastPackedOutputFile.lastIndexOf("/")));
+                openFolder(folder || lastPackedOutputFile);
+            }
+        });
+    }
 }
 
 // Context Menu Helpers
@@ -458,6 +568,188 @@ async function refreshShellStatus() {
         }
     } catch (e) {
         shellStatusIndicator.textContent = "Status check error: " + e.message;
+    }
+}
+
+// Mode Switcher Helper
+function switchAppMode(mode) {
+    activeAppMode = mode;
+    if (mode === "extract") {
+        if (navModeExtract) navModeExtract.classList.add("active");
+        if (navModePack) navModePack.classList.remove("active");
+        if (packView) packView.style.display = "none";
+
+        if (currentContainer) {
+            dropzoneView.style.display = "none";
+            workspaceView.style.display = "block";
+        } else {
+            dropzoneView.style.display = "flex";
+            workspaceView.style.display = "none";
+        }
+    } else if (mode === "pack") {
+        if (navModePack) navModePack.classList.add("active");
+        if (navModeExtract) navModeExtract.classList.remove("active");
+        dropzoneView.style.display = "none";
+        workspaceView.style.display = "none";
+        if (packView) packView.style.display = "block";
+    }
+}
+
+// Pack Helpers
+async function browsePackSourceFolder() {
+    if (!isNative) {
+        showToast("Folder browsing available in desktop app");
+        return;
+    }
+    try {
+        const res = await nativeCall("browse_pack_folder");
+        if (res && res.path) {
+            setPackSourceFolder(res.path, res.name);
+        }
+    } catch (e) {
+        showToast("Error choosing folder: " + e.message);
+    }
+}
+
+function setPackSourceFolder(folderPath, folderName) {
+    selectedPackSourceDir = folderPath;
+    const name = folderName || folderPath.split(/[\\/]/).pop() || "Custom Game";
+
+    if (packSourcePath) packSourcePath.textContent = folderPath;
+    if (packSourcePreview) packSourcePreview.style.display = "block";
+    if (packDropzoneTitle) packDropzoneTitle.textContent = "Folder: " + name;
+
+    if (packTitleInput && (!packTitleInput.value || packTitleInput.value.trim() === "")) {
+        packTitleInput.value = name;
+    }
+
+    if (packDestInput && (!packDestInput.value || packDestInput.value.trim() === "")) {
+        packDestInput.value = folderPath + ".nup";
+    }
+}
+
+async function browsePackDestination() {
+    if (!isNative) {
+        showToast("Save file dialog available in desktop app");
+        return;
+    }
+    try {
+        const defaultName = (packTitleInput && packTitleInput.value.trim()) || "game";
+        const res = await nativeCall("browse_pack_output", { defaultName });
+        if (res && res.path && packDestInput) {
+            packDestInput.value = res.path;
+        }
+    } catch (e) {
+        showToast("Error selecting destination: " + e.message);
+    }
+}
+
+async function startPackaging() {
+    if (!selectedPackSourceDir) {
+        alert("Please select a game source folder to pack!");
+        return;
+    }
+
+    const outputPath = packDestInput ? packDestInput.value.trim() : "";
+    if (!outputPath) {
+        alert("Please select an output .NUP destination file path!");
+        return;
+    }
+
+    const titleName = (packTitleInput && packTitleInput.value.trim()) || "Custom Game";
+    const publisher = (packPublisherInput && packPublisherInput.value.trim()) || "Homebrew / Mod";
+    const titleId = (packTitleIdInput && packTitleIdInput.value.trim()) || "0100000000001000";
+    const version = (packVersionInput && packVersionInput.value.trim()) || "1.0.0";
+    const compRadio = document.querySelector("input[name='pack-compression']:checked");
+    const compressionLevel = compRadio ? parseInt(compRadio.value, 10) : 3;
+
+    lastPackedOutputFile = outputPath;
+
+    // Reset Modal
+    if (packModalPct) packModalPct.textContent = "0%";
+    if (packProgressBar) packProgressBar.style.width = "0%";
+    if (packCurrentFile) packCurrentFile.textContent = "Scanning directory structure...";
+    if (packStatsFiles) packStatsFiles.textContent = "0 / 0 files";
+    if (packStatsBytes) packStatsBytes.textContent = "0 B / 0 B";
+    if (packLogBox) packLogBox.innerHTML = "";
+    if (btnPackModalOpenFolder) btnPackModalOpenFolder.style.display = "none";
+    if (btnPackModalClose) btnPackModalClose.style.display = "none";
+    if (btnPackModalCancel) btnPackModalCancel.style.display = "inline-flex";
+
+    if (packModal) packModal.classList.add("active");
+    addLogEntry(packLogBox, `Starting packaging for "${titleName}"...`, "info");
+
+    if (isNative) {
+        try {
+            await nativeCall("start_pack", {
+                sourceDir: selectedPackSourceDir,
+                outputPath: outputPath,
+                titleName: titleName,
+                publisher: publisher,
+                titleId: titleId,
+                version: version,
+                compressionLevel: compressionLevel
+            });
+        } catch (e) {
+            onPackError({ error: e.message });
+        }
+    } else {
+        alert("Packaging is supported in desktop app mode.");
+    }
+}
+
+function onPackProgress(info) {
+    if (!info) return;
+    const pct = Math.round(info.percent || 0);
+
+    if (packModalPct) packModalPct.textContent = `${pct}%`;
+    if (packProgressBar) packProgressBar.style.width = `${pct}%`;
+
+    if (packCurrentFile && info.currentFile) {
+        packCurrentFile.textContent = info.currentFile;
+    }
+
+    if (packStatsFiles && info.totalFiles) {
+        packStatsFiles.textContent = `${info.filesPacked} / ${info.totalFiles} files`;
+    }
+
+    if (packStatsBytes) {
+        const procStr = formatBytes(info.bytesProcessed || 0);
+        const totStr = formatBytes(info.totalBytes || 0);
+        const speed = info.speedFormatted ? ` [${info.speedFormatted}]` : "";
+        const ratio = info.compressionRatio > 0 ? ` (${info.compressionRatio}% saved)` : "";
+        packStatsBytes.textContent = `${procStr} / ${totStr}${ratio}${speed}`;
+    }
+
+    if (packLogBox && info.currentFile && info.status === "packing") {
+        if (info.filesPacked % 10 === 0 || info.filesPacked === info.totalFiles) {
+            addLogEntry(packLogBox, `[PACK] ${info.currentFile}`, "success");
+        }
+    }
+}
+
+function onPackDone(msg) {
+    if (packModalPct) packModalPct.textContent = "100%";
+    if (packProgressBar) packProgressBar.style.width = "100%";
+    if (packCurrentFile) packCurrentFile.textContent = "NUP Container built successfully!";
+
+    if (btnPackModalOpenFolder) btnPackModalOpenFolder.style.display = "inline-flex";
+    if (btnPackModalClose) btnPackModalClose.style.display = "inline-flex";
+    if (btnPackModalCancel) btnPackModalCancel.style.display = "none";
+
+    if (packLogBox) {
+        addLogEntry(packLogBox, "Container generated and verified cleanly!", "success");
+    }
+
+    showToast("NUP Container built successfully!");
+}
+
+function onPackError(msg) {
+    if (packCurrentFile) packCurrentFile.textContent = "Packaging Error: " + (msg.error || "Unknown error");
+    if (btnPackModalClose) btnPackModalClose.style.display = "inline-flex";
+    if (btnPackModalCancel) btnPackModalCancel.style.display = "none";
+    if (packLogBox) {
+        addLogEntry(packLogBox, "ERROR: " + (msg.error || "Packaging failed"), "error");
     }
 }
 

@@ -851,6 +851,100 @@ body {
     margin: 0.25rem 0;
 }
 
+/* Mode Switcher in Header */
+.nav-mode-selector {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 2px;
+    margin-left: 0.5rem;
+}
+
+.nav-mode-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.nav-mode-btn:hover {
+    color: var(--text-primary);
+}
+
+.nav-mode-btn.active {
+    color: var(--text-primary);
+    background: var(--bg-surface-elevated);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+#nav-mode-extract.active {
+    color: var(--switch-red);
+}
+
+#nav-mode-pack.active {
+    color: var(--switch-blue);
+}
+
+/* Pack View */
+.pack-view-container {
+    width: 100%;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 1.5rem 0;
+}
+
+.pack-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+@media (max-width: 900px) {
+    .pack-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.pack-card {
+    background: rgba(18, 20, 29, 0.7);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.pack-dropzone {
+    border: 2px dashed rgba(255, 255, 255, 0.15);
+    border-radius: var(--radius-md);
+    padding: 2rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    cursor: pointer;
+    background: rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease;
+}
+
+.pack-dropzone:hover, .pack-dropzone.dragover {
+    border-color: var(--switch-blue);
+    background: rgba(0, 212, 255, 0.05);
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.15);
+}
+
 /* Scrollbars */
 ::-webkit-scrollbar {
     width: 6px;

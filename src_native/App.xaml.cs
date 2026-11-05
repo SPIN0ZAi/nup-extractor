@@ -64,6 +64,52 @@ public partial class App : Application
                 return;
             }
 
+            if (first == "--pack" && e.Args.Length > 2)
+            {
+                string sourceFolder = e.Args[1];
+                string outputNup = e.Args[2];
+                try
+                {
+                    var opt = new PackOptions
+                    {
+                        SourceDirectory = sourceFolder,
+                        OutputFilePath = outputNup,
+                        TitleName = Path.GetFileName(sourceFolder)
+                    };
+                    NupWriter.Pack(opt);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Failed to pack '{sourceFolder}':\n{ex.Message}", "Packaging Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                Shutdown(0);
+                return;
+            }
+
+            if (first == "--pack-here" && e.Args.Length > 1)
+            {
+                string sourceFolder = e.Args[1];
+                string baseDir = Path.GetDirectoryName(Path.GetFullPath(sourceFolder)) ?? Directory.GetCurrentDirectory();
+                string outputNup = Path.Combine(baseDir, Path.GetFileName(sourceFolder) + ".nup");
+                try
+                {
+                    var opt = new PackOptions
+                    {
+                        SourceDirectory = sourceFolder,
+                        OutputFilePath = outputNup,
+                        TitleName = Path.GetFileName(sourceFolder)
+                    };
+                    NupWriter.Pack(opt);
+                    NupEngine.OpenFolder(baseDir);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Failed to pack '{Path.GetFileName(sourceFolder)}':\n{ex.Message}", "Packaging Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                Shutdown(0);
+                return;
+            }
+
             if (File.Exists(first) && first.EndsWith(".nup", StringComparison.OrdinalIgnoreCase))
             {
                 InitialFilePath = Path.GetFullPath(first);
