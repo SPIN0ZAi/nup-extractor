@@ -35,6 +35,7 @@ public class PackProgressInfo
     public string SpeedFormatted { get; set; } = "";
     public double Percent { get; set; }
     public string? Error { get; set; }
+    public double ElapsedSeconds { get; set; }
 }
 
 public static class NupWriter
@@ -314,7 +315,8 @@ public static class NupWriter
                     BytesWritten = writtenBlobBytes,
                     CompressionRatio = ratio,
                     SpeedFormatted = speed,
-                    Percent = Math.Min(99.0, pct)
+                    Percent = Math.Min(99.0, pct),
+                    ElapsedSeconds = sw.Elapsed.TotalSeconds
                 });
             }
         }
@@ -326,7 +328,8 @@ public static class NupWriter
         {
             Status = "finalizing",
             CurrentFile = "Generating Table of Contents...",
-            Percent = 99.5
+            Percent = 99.5,
+            ElapsedSeconds = sw.Elapsed.TotalSeconds
         });
 
         byte[] tocBytes = new byte[tocSize];
@@ -451,6 +454,7 @@ public static class NupWriter
             ? Math.Round((1.0 - ((double)writtenBlobBytes / (double)totalUncompressedBytes)) * 100.0, 1)
             : 0.0;
 
+        sw.Stop();
         progress?.Report(new PackProgressInfo
         {
             Status = "done",
@@ -461,7 +465,8 @@ public static class NupWriter
             TotalBytes = totalUncompressedBytes,
             BytesWritten = writtenBlobBytes,
             CompressionRatio = finalRatio,
-            Percent = 100.0
+            Percent = 100.0,
+            ElapsedSeconds = sw.Elapsed.TotalSeconds
         });
     }
 

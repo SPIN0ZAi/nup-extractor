@@ -414,7 +414,9 @@ public partial class MainWindow : Window
 
         try
         {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             await Task.Run(() => NupEngine.Extract(filePath, destDir, mode, pkgIdx, subtreePath, progress, token), token);
+            sw.Stop();
 
             if (openWhenDone)
             {
@@ -425,7 +427,8 @@ public partial class MainWindow : Window
             {
                 type = "extract_done",
                 success = true,
-                destDir
+                destDir,
+                elapsedSeconds = sw.Elapsed.TotalSeconds
             });
         }
         catch (OperationCanceledException)
@@ -741,12 +744,15 @@ public partial class MainWindow : Window
         {
             try
             {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 NupEngine.Pack(options, progress, ct);
+                sw.Stop();
                 SendIpcResponse(new
                 {
                     type = "pack_done",
                     outputPath = options.OutputFilePath,
-                    sourceDir = options.SourceDirectory
+                    sourceDir = options.SourceDirectory,
+                    elapsedSeconds = sw.Elapsed.TotalSeconds
                 });
             }
             catch (OperationCanceledException)

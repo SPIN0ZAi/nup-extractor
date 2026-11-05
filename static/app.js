@@ -6,6 +6,10 @@ let treeCache = {}; // dirIndex -> dirData
 let expandedDirs = new Set();
 let isSearching = false;
 let lastExtractedDest = null;
+let extractStartTime = 0;
+let extractSmoothedEta = null;
+let packStartTime = 0;
+let packSmoothedEta = null;
 
 // Native IPC Helper
 const isNative = typeof window.chrome !== "undefined" && typeof window.chrome.webview !== "undefined";
@@ -664,6 +668,8 @@ async function startPackaging() {
     const compressionLevel = compRadio ? parseInt(compRadio.value, 10) : 3;
 
     lastPackedOutputFile = outputPath;
+    packStartTime = Date.now();
+    packSmoothedEta = null;
 
     // Reset Modal
     if (packModalPct) packModalPct.textContent = "0%";
@@ -709,13 +715,28 @@ function onPackProgress(info) {
         packCurrentFile.textContent = info.currentFile;
     }
 
-    if (packStatsFiles && info.totalFiles) {
-        packStatsFiles.textContent = `${info.filesPacked} / ${info.totalFiles} files`;
+    const packedBytes = info.bytesProcessed || 0;
+    const totalBytes = info.totalBytes || 0;
+    const filesPacked = info.filesPacked || 0;
+    const totalFiles = info.totalFiles || 0;
+
+    let etaResult = { etaStr: "", smoothedEta: packSmoothedEta };
+    if (totalBytes > 0 && packedBytes > 0) {
+        etaResult = calculateEta(packStartTime, packedBytes, totalBytes, packSmoothedEta);
+    } else if (totalFiles > 0 && filesPacked > 0) {
+        etaResult = calculateEta(packStartTime, filesPacked, totalFiles, packSmoothedEta);
+    }
+    packSmoothedEta = etaResult.smoothedEta;
+
+    const etaSuffix = etaResult.etaStr ? ` • ~${etaResult.etaStr} remaining` : "";
+
+    if (packStatsFiles && totalFiles) {
+        packStatsFiles.textContent = `${filesPacked} / ${totalFiles} files${etaSuffix}`;
     }
 
     if (packStatsBytes) {
-        const procStr = formatBytes(info.bytesProcessed || 0);
-        const totStr = formatBytes(info.totalBytes || 0);
+        const procStr = formatBytes(packedBytes);
+        const totStr = formatBytes(totalBytes);
         const speed = info.speedFormatted ? ` [${info.speedFormatted}]` : "";
         const ratio = info.compressionRatio > 0 ? ` (${info.compressionRatio}% saved)` : "";
         packStatsBytes.textContent = `${procStr} / ${totStr}${ratio}${speed}`;
@@ -729,19 +750,25 @@ function onPackProgress(info) {
 }
 
 function onPackDone(msg) {
+    const elapsedSec = (msg && typeof msg.elapsedSeconds === "number" && msg.elapsedSeconds > 0)
+        ? msg.elapsedSeconds
+        : (packStartTime ? Math.max(0.1, (Date.now() - packStartTime) / 1000.0) : 0);
+    const timeSpent = formatDuration(elapsedSec);
+
     if (packModalPct) packModalPct.textContent = "100%";
     if (packProgressBar) packProgressBar.style.width = "100%";
-    if (packCurrentFile) packCurrentFile.textContent = "NUP Container built successfully!";
+    if (packCurrentFile) packCurrentFile.textContent = `✓ NUP Container built in ${timeSpent}!`;
+    if (packStatsFiles) packStatsFiles.textContent = `Finished packaging • Took ${timeSpent}`;
 
     if (btnPackModalOpenFolder) btnPackModalOpenFolder.style.display = "inline-flex";
     if (btnPackModalClose) btnPackModalClose.style.display = "inline-flex";
     if (btnPackModalCancel) btnPackModalCancel.style.display = "none";
 
     if (packLogBox) {
-        addLogEntry(packLogBox, "Container generated and verified cleanly!", "success");
+        addLogEntry(packLogBox, `✓ Container generated in ${timeSpent} and verified cleanly!`, "success");
     }
 
-    showToast("NUP Container built successfully!");
+    showToast(`NUP Container built in ${timeSpent}!`);
 }
 
 function onPackError(msg) {
@@ -1240,6 +1267,8 @@ async function startExtraction() {
 
 async function executeExtraction(nupPath, dest, mode, openWhenDone) {
     lastExtractedDest = dest;
+    extractStartTime = Date.now();
+    extractSmoothedEta = null;
 
     // Reset modal
     extractModalPct.textContent = "0%";
@@ -1317,9 +1346,20 @@ function onExtractProgress(info) {
 
     const clampedPct = Math.min(100, Math.max(0, Math.round(rawPct * 10) / 10));
 
+    // Calculate ETA
+    let etaResult = { etaStr: "", smoothedEta: extractSmoothedEta };
+    if (totalBytes > 0 && bytesWritten > 0) {
+        etaResult = calculateEta(extractStartTime, bytesWritten, totalBytes, extractSmoothedEta);
+    } else if (total > 0 && current > 0) {
+        etaResult = calculateEta(extractStartTime, current, total, extractSmoothedEta);
+    }
+    extractSmoothedEta = etaResult.smoothedEta;
+
+    const etaSuffix = etaResult.etaStr ? ` • ~${etaResult.etaStr} remaining` : "";
+
     extractProgressBar.style.width = `${clampedPct}%`;
     extractModalPct.textContent = `${clampedPct}%`;
-    extractStatsFiles.textContent = `Extracted ${current} of ${total} files`;
+    extractStatsFiles.textContent = `Extracted ${current} of ${total} files${etaSuffix}`;
     extractStatsBytes.textContent = `${formatBytes(bytesWritten)} / ${formatBytes(totalBytes)}`;
     extractCurrentFile.textContent = fileName;
 
@@ -1329,13 +1369,20 @@ function onExtractProgress(info) {
 }
 
 function onExtractDone(msg) {
+    const elapsedSec = (msg && typeof msg.elapsedSeconds === "number" && msg.elapsedSeconds > 0)
+        ? msg.elapsedSeconds
+        : (extractStartTime ? Math.max(0.1, (Date.now() - extractStartTime) / 1000.0) : 0);
+    const timeSpent = formatDuration(elapsedSec);
+
     extractProgressBar.style.width = "100%";
     extractModalPct.textContent = "100%";
-    extractCurrentFile.textContent = "✓ Extraction completed successfully!";
+    extractCurrentFile.textContent = `✓ Extraction completed in ${timeSpent}!`;
+    extractStatsFiles.textContent = `Extracted all files • Took ${timeSpent}`;
     const dest = (msg && (msg.destDir || msg.dest_dir || msg.DestDir)) || lastExtractedDest || "Destination";
-    addLogEntry(extractLogBox, `✓ All files extracted to: ${dest}`, "success");
+    addLogEntry(extractLogBox, `✓ Completed in ${timeSpent}. All files extracted to: ${dest}`, "success");
     btnModalOpenFolder.style.display = "inline-flex";
     btnModalClose.style.display = "inline-flex";
+    showToast(`Extraction finished in ${timeSpent}!`);
 }
 
 function onExtractError(msg) {
@@ -1455,6 +1502,78 @@ function formatBytes(bytes) {
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
     if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB";
     return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+}
+
+function formatDuration(seconds) {
+    if (typeof seconds !== "number" || isNaN(seconds) || seconds < 0 || !isFinite(seconds)) {
+        return "0s";
+    }
+    if (seconds < 0.1) {
+        return "< 0.1s";
+    }
+    if (seconds < 10) {
+        return `${seconds.toFixed(1)}s`;
+    }
+    const totalSec = Math.round(seconds);
+    if (totalSec < 60) {
+        return `${totalSec}s`;
+    }
+    const mins = Math.floor(totalSec / 60);
+    const remSec = totalSec % 60;
+    if (mins < 60) {
+        return remSec > 0 ? `${mins}m ${remSec}s` : `${mins}m`;
+    }
+    const hours = Math.floor(mins / 60);
+    const remMin = mins % 60;
+    return remMin > 0 ? `${hours}h ${remMin}m` : `${hours}h`;
+}
+
+function formatEta(seconds) {
+    if (typeof seconds !== "number" || isNaN(seconds) || seconds <= 0 || !isFinite(seconds)) {
+        return "";
+    }
+    const totalSec = Math.round(seconds);
+    if (totalSec < 2) {
+        return "< 2s";
+    }
+    if (totalSec < 60) {
+        return `${totalSec}s`;
+    }
+    const mins = Math.floor(totalSec / 60);
+    const remSec = totalSec % 60;
+    if (mins < 60) {
+        return remSec > 0 ? `${mins}m ${remSec}s` : `${mins}m`;
+    }
+    const hours = Math.floor(mins / 60);
+    const remMin = mins % 60;
+    return remMin > 0 ? `${hours}h ${remMin}m` : `${hours}h`;
+}
+
+function calculateEta(startTimeMs, currentWork, totalWork, lastSmoothedEta) {
+    if (!startTimeMs || currentWork <= 0 || totalWork <= 0 || currentWork >= totalWork) {
+        return { etaStr: "", smoothedEta: null };
+    }
+    const elapsedSec = (Date.now() - startTimeMs) / 1000.0;
+    if (elapsedSec < 0.6) {
+        return { etaStr: "", smoothedEta: null };
+    }
+    const fraction = currentWork / totalWork;
+    if (fraction <= 0 || fraction >= 1.0) {
+        return { etaStr: "", smoothedEta: null };
+    }
+    const ratePerSec = fraction / elapsedSec;
+    if (ratePerSec <= 0) {
+        return { etaStr: "", smoothedEta: null };
+    }
+    const rawRemainingSec = (1.0 - fraction) / ratePerSec;
+    const smoothed = (lastSmoothedEta == null)
+        ? rawRemainingSec
+        : (lastSmoothedEta * 0.7) + (rawRemainingSec * 0.3);
+
+    return {
+        etaStr: formatEta(smoothed),
+        smoothedEta: smoothed
+    };
 }
 
 function copyText(elementId) {

@@ -21,6 +21,7 @@ public class ProgressInfo
     public ulong TotalBytes { get; set; }
     public string? DestDir { get; set; }
     public string? Error { get; set; }
+    public double ElapsedSeconds { get; set; }
 }
 
 public class VerifyProgressInfo
@@ -474,11 +475,13 @@ public static class NupEngine
                     FileSize = fSize,
                     BytesWritten = bytesWritten,
                     TotalBytes = totalBytes,
-                    DestDir = cleanDestDir
+                    DestDir = cleanDestDir,
+                    ElapsedSeconds = sw.Elapsed.TotalSeconds
                 });
             }
         }
 
+        sw.Stop();
         progress.Report(new ProgressInfo
         {
             Status = "completed",
@@ -488,7 +491,8 @@ public static class NupEngine
             FileName = "Done",
             BytesWritten = bytesWritten,
             TotalBytes = totalBytes,
-            DestDir = cleanDestDir
+            DestDir = cleanDestDir,
+            ElapsedSeconds = sw.Elapsed.TotalSeconds
         });
     }
 

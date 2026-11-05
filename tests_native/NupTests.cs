@@ -563,6 +563,58 @@ public class NupTests
     }
 
     [Fact]
+    public void Test_Extraction_And_Packaging_TrackElapsedSeconds()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), "nup_elapsed_test_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            // 1. Test extraction elapsed tracking
+            ProgressInfo? lastExtractProgress = null;
+            var extractProgress = new SyncProgress<ProgressInfo>(info => lastExtractProgress = info);
+            NupEngine.Extract(SampleNupPath, Path.Combine(tempDir, "extracted"), "all", null, null, extractProgress, CancellationToken.None);
+
+            Assert.NotNull(lastExtractProgress);
+            Assert.Equal("completed", lastExtractProgress.Status);
+            Assert.True(lastExtractProgress.ElapsedSeconds >= 0, "ElapsedSeconds should be non-negative");
+
+            // Verify camelCase JSON serialization
+            var jsonOpt = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+            string extractJson = JsonSerializer.Serialize(lastExtractProgress, jsonOpt);
+            Assert.Contains("\"elapsedSeconds\":", extractJson);
+
+            // 2. Test packaging elapsed tracking
+            string packSource = Path.Combine(tempDir, "pack_src");
+            Directory.CreateDirectory(packSource);
+            File.WriteAllText(Path.Combine(packSource, "file.txt"), "Testing elapsed time.");
+
+            string outNup = Path.Combine(tempDir, "output.nup");
+            PackProgressInfo? lastPackProgress = null;
+            var packProgress = new SyncProgress<PackProgressInfo>(info => lastPackProgress = info);
+
+            var packOpts = new PackOptions
+            {
+                SourceDirectory = packSource,
+                OutputFilePath = outNup,
+                TitleName = "TimeTest"
+            };
+
+            NupEngine.Pack(packOpts, packProgress, CancellationToken.None);
+
+            Assert.NotNull(lastPackProgress);
+            Assert.Equal("done", lastPackProgress.Status);
+            Assert.True(lastPackProgress.ElapsedSeconds >= 0, "ElapsedSeconds should be non-negative");
+
+            string packJson = JsonSerializer.Serialize(lastPackProgress, jsonOpt);
+            Assert.Contains("\"elapsedSeconds\":", packJson);
+        }
+        finally
+        {
+            try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true); } catch { }
+        }
+    }
+
+    [Fact]
     public void Test_StaticAssets_JavaScriptSyntaxValidation()
     {
         string jsPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../static/app.js"));
