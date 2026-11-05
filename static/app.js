@@ -1436,10 +1436,16 @@ function onVerifyError(msg) {
 }
 
 function addLogEntry(box, text, type = "") {
+    if (!box) return;
     const entry = document.createElement("div");
     entry.className = `log-entry ${type}`;
     entry.textContent = text;
     box.appendChild(entry);
+
+    if (box.childElementCount > 300) {
+        box.removeChild(box.firstElementChild);
+    }
+
     box.scrollTop = box.scrollHeight;
 }
 
