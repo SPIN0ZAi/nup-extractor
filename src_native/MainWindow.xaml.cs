@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _extractCts;
     private CancellationTokenSource? _verifyCts;
     private CancellationTokenSource? _updateCts;
+    private CancellationTokenSource? _packCts;
 
     public MainWindow()
     {
@@ -214,6 +215,26 @@ public partial class MainWindow : Window
                 case "cancel_verify":
                     _verifyCts?.Cancel();
                     break;
+
+                case "browse_pack_folder":
+                    HandleBrowsePackFolder(id);
+                    break;
+
+                case "browse_pack_output":
+                    HandleBrowsePackOutput(id, root);
+                    break;
+
+                case "inspect_pack_source":
+                    HandleInspectPackSource(id, root);
+                    break;
+
+                case "start_pack":
+                    HandleStartPack(id, root);
+                    break;
+
+                case "cancel_pack":
+                    _packCts?.Cancel();
+                    break;
             }
         }
         catch (Exception ex)
@@ -397,7 +418,9 @@ public partial class MainWindow : Window
 
         try
         {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             await Task.Run(() => NupEngine.Extract(filePath, destDir, mode, pkgIdx, subtreePath, progress, token), token);
+            sw.Stop();
 
             if (openWhenDone)
             {
@@ -408,7 +431,8 @@ public partial class MainWindow : Window
             {
                 type = "extract_done",
                 success = true,
-                destDir
+                destDir,
+                elapsedSeconds = sw.Elapsed.TotalSeconds
             });
         }
         catch (OperationCanceledException)
@@ -628,6 +652,148 @@ public partial class MainWindow : Window
                 error = ex.Message
             });
         }
+    }
+
+    private void HandleBrowsePackFolder(string id)
+    {
+        var ofd = new OpenFolderDialog
+        {
+            Title = "Select Game Folder to Pack into .NUP",
+            Multiselect = false
+        };
+        bool? result = ofd.ShowDialog(this);
+        SendIpcResponse(new
+        {
+            id,
+            action = "browse_pack_folder_result",
+            success = result == true,
+            path = result == true ? ofd.FolderName : null,
+            name = result == true ? Path.GetFileName(ofd.FolderName) : null
+        });
+    }
+
+    private void HandleBrowsePackOutput(string id, JsonElement root)
+    {
+        string defaultName = GetString(root, "defaultName", "name") ?? "game";
+        var sfd = new SaveFileDialog
+        {
+            Title = "Save .NUP Container As",
+            FileName = defaultName.EndsWith(".nup", StringComparison.OrdinalIgnoreCase) ? defaultName : defaultName + ".nup",
+            Filter = "NUP Container (*.nup)|*.nup|All files (*.*)|*.*"
+        };
+        bool? result = sfd.ShowDialog(this);
+        SendIpcResponse(new
+        {
+            id,
+            action = "browse_pack_output_result",
+            success = result == true,
+            path = result == true ? sfd.FileName : null
+        });
+    }
+
+    private void HandleInspectPackSource(string id, JsonElement root)
+    {
+        string? sourceDir = GetString(root, "sourceDir", "source_dir");
+        if (!string.IsNullOrWhiteSpace(sourceDir) && Directory.Exists(sourceDir))
+        {
+            var pkgs = NupWriter.DetectPackageSummary(sourceDir);
+            SendIpcResponse(new
+            {
+                id,
+                action = "inspect_pack_source_result",
+                success = true,
+                packages = pkgs
+            });
+        }
+        else
+        {
+            SendIpcResponse(new
+            {
+                id,
+                action = "inspect_pack_source_result",
+                success = false,
+                packages = Array.Empty<object>()
+            });
+        }
+    }
+
+    private void HandleStartPack(string id, JsonElement root)
+    {
+        string? sourceDir = GetString(root, "sourceDir", "source_dir");
+        string? outputPath = GetString(root, "outputPath", "output_path");
+
+        if (string.IsNullOrWhiteSpace(sourceDir) || !Directory.Exists(sourceDir))
+        {
+            SendIpcResponse(new { type = "pack_error", error = $"Source directory not found: {sourceDir}" });
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(outputPath))
+        {
+            SendIpcResponse(new { type = "pack_error", error = "Output file path cannot be empty." });
+            return;
+        }
+
+        string titleName = GetString(root, "titleName", "title_name") ?? Path.GetFileName(sourceDir);
+        string publisher = GetString(root, "publisher") ?? "Homebrew / Mod";
+        string versionStr = GetString(root, "version") ?? "1.0.0";
+        int compressionLevel = GetInt(root, "compressionLevel", "compression_level") ?? 3;
+
+        ulong titleId = 0x0100000000001000UL;
+        string? titleIdStr = GetString(root, "titleId", "title_id");
+        if (!string.IsNullOrWhiteSpace(titleIdStr))
+        {
+            string clean = titleIdStr.Trim();
+            if (clean.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                clean = clean[2..];
+            if (ulong.TryParse(clean, System.Globalization.NumberStyles.HexNumber, null, out ulong parsedId))
+                titleId = parsedId;
+        }
+
+        _packCts?.Cancel();
+        _packCts = new CancellationTokenSource();
+        var ct = _packCts.Token;
+
+        var options = new PackOptions
+        {
+            SourceDirectory = sourceDir,
+            OutputFilePath = outputPath,
+            TitleName = titleName,
+            Publisher = publisher,
+            TitleId = titleId,
+            VersionString = versionStr,
+            CompressionLevel = compressionLevel
+        };
+
+        var progress = new Progress<PackProgressInfo>(info =>
+        {
+            SendIpcResponse(new { type = "pack_progress", info });
+        });
+
+        Task.Run(() =>
+        {
+            try
+            {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                NupEngine.Pack(options, progress, ct);
+                sw.Stop();
+                SendIpcResponse(new
+                {
+                    type = "pack_done",
+                    outputPath = options.OutputFilePath,
+                    sourceDir = options.SourceDirectory,
+                    elapsedSeconds = sw.Elapsed.TotalSeconds
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                SendIpcResponse(new { type = "pack_error", error = "Packaging cancelled by user." });
+            }
+            catch (Exception ex)
+            {
+                SendIpcResponse(new { type = "pack_error", error = ex.Message });
+            }
+        }, ct);
     }
 
     private void SendIpcResponse(object payload)

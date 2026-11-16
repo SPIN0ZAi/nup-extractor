@@ -6,6 +6,10 @@ let treeCache = {}; // dirIndex -> dirData
 let expandedDirs = new Set();
 let isSearching = false;
 let lastExtractedDest = null;
+let extractStartTime = 0;
+let extractSmoothedEta = null;
+let packStartTime = 0;
+let packSmoothedEta = null;
 
 // Native IPC Helper
 const isNative = typeof window.chrome !== "undefined" && typeof window.chrome.webview !== "undefined";
@@ -68,6 +72,12 @@ if (isNative) {
             onUpdateProgress(info);
         } else if (type === "update_error") {
             onUpdateError(msg);
+        } else if (type === "pack_progress" && info) {
+            onPackProgress(info);
+        } else if (type === "pack_done") {
+            onPackDone(msg);
+        } else if (type === "pack_error") {
+            onPackError(msg);
         }
     });
 }
@@ -154,6 +164,41 @@ const shellStatusIndicator = document.getElementById("shell-status-indicator");
 const btnToggleShellIntegration = document.getElementById("btn-toggle-shell-integration");
 const btnCloseShellSettings = document.getElementById("btn-close-shell-settings");
 let isShellRegistered = false;
+
+// Mode Navigation Elements
+const navModeExtract = document.getElementById("nav-mode-extract");
+const navModePack = document.getElementById("nav-mode-pack");
+const packView = document.getElementById("pack-view");
+let activeAppMode = "extract"; // "extract" | "pack"
+
+// Pack Form Elements
+const packDropzone = document.getElementById("pack-dropzone");
+const packDropzoneTitle = document.getElementById("pack-dropzone-title");
+const btnBrowsePackSource = document.getElementById("btn-browse-pack-source");
+const packSourcePreview = document.getElementById("pack-source-preview");
+const packSourcePath = document.getElementById("pack-source-path");
+const packDestInput = document.getElementById("pack-dest-input");
+const btnBrowsePackDest = document.getElementById("btn-browse-pack-dest");
+const packTitleInput = document.getElementById("pack-title-input");
+const packPublisherInput = document.getElementById("pack-publisher-input");
+const packTitleIdInput = document.getElementById("pack-titleid-input");
+const packVersionInput = document.getElementById("pack-version-input");
+const btnStartPack = document.getElementById("btn-start-pack");
+let selectedPackSourceDir = null;
+let lastPackedOutputFile = null;
+
+// Pack Modal Elements
+const packModal = document.getElementById("pack-modal");
+const packModalTitle = document.getElementById("pack-modal-title");
+const packCurrentFile = document.getElementById("pack-current-file");
+const packModalPct = document.getElementById("pack-modal-pct");
+const packProgressBar = document.getElementById("pack-progress-bar");
+const packStatsFiles = document.getElementById("pack-stats-files");
+const packStatsBytes = document.getElementById("pack-stats-bytes");
+const packLogBox = document.getElementById("pack-log-box");
+const btnPackModalOpenFolder = document.getElementById("btn-pack-modal-open-folder");
+const btnPackModalCancel = document.getElementById("btn-pack-modal-cancel");
+const btnPackModalClose = document.getElementById("btn-pack-modal-close");
 
 // Initialization
 document.addEventListener("DOMContentLoaded", () => {
@@ -396,6 +441,75 @@ function setupEventListeners() {
             }
         });
     }
+
+    // Mode Switching
+    if (navModeExtract) {
+        navModeExtract.addEventListener("click", () => switchAppMode("extract"));
+    }
+    if (navModePack) {
+        navModePack.addEventListener("click", () => switchAppMode("pack"));
+    }
+
+    // Pack Source Folder Browse
+    if (btnBrowsePackSource) {
+        btnBrowsePackSource.addEventListener("click", browsePackSourceFolder);
+    }
+
+    // Pack Destination Browse
+    if (btnBrowsePackDest) {
+        btnBrowsePackDest.addEventListener("click", browsePackDestination);
+    }
+
+    // Start Packaging
+    if (btnStartPack) {
+        btnStartPack.addEventListener("click", startPackaging);
+    }
+
+    // Pack Dropzone Events
+    if (packDropzone) {
+        packDropzone.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            packDropzone.classList.add("dragover");
+        });
+        packDropzone.addEventListener("dragleave", () => {
+            packDropzone.classList.remove("dragover");
+        });
+        packDropzone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            packDropzone.classList.remove("dragover");
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                const item = e.dataTransfer.files[0];
+                if (item.path) {
+                    setPackSourceFolder(item.path);
+                }
+            }
+        });
+    }
+
+    // Pack Modal Buttons
+    if (btnPackModalCancel) {
+        btnPackModalCancel.addEventListener("click", () => {
+            if (isNative) {
+                nativeCall("cancel_pack").catch(() => {});
+            }
+            packModal.classList.remove("active");
+        });
+    }
+
+    if (btnPackModalClose) {
+        btnPackModalClose.addEventListener("click", () => {
+            packModal.classList.remove("active");
+        });
+    }
+
+    if (btnPackModalOpenFolder) {
+        btnPackModalOpenFolder.addEventListener("click", () => {
+            if (lastPackedOutputFile) {
+                const folder = lastPackedOutputFile.substring(0, Math.max(lastPackedOutputFile.lastIndexOf("\\"), lastPackedOutputFile.lastIndexOf("/")));
+                openFolder(folder || lastPackedOutputFile);
+            }
+        });
+    }
 }
 
 // Context Menu Helpers
@@ -458,6 +572,239 @@ async function refreshShellStatus() {
         }
     } catch (e) {
         shellStatusIndicator.textContent = "Status check error: " + e.message;
+    }
+}
+
+// Mode Switcher Helper
+function switchAppMode(mode) {
+    activeAppMode = mode;
+    if (mode === "extract") {
+        if (navModeExtract) navModeExtract.classList.add("active");
+        if (navModePack) navModePack.classList.remove("active");
+        if (packView) packView.style.display = "none";
+
+        if (currentContainer) {
+            dropzoneView.style.display = "none";
+            workspaceView.style.display = "block";
+        } else {
+            dropzoneView.style.display = "flex";
+            workspaceView.style.display = "none";
+        }
+    } else if (mode === "pack") {
+        if (navModePack) navModePack.classList.add("active");
+        if (navModeExtract) navModeExtract.classList.remove("active");
+        dropzoneView.style.display = "none";
+        workspaceView.style.display = "none";
+        if (packView) packView.style.display = "block";
+    }
+}
+
+// Pack Helpers
+async function browsePackSourceFolder() {
+    if (!isNative) {
+        showToast("Folder browsing available in desktop app");
+        return;
+    }
+    try {
+        const res = await nativeCall("browse_pack_folder");
+        if (res && res.path) {
+            setPackSourceFolder(res.path, res.name);
+        }
+    } catch (e) {
+        showToast("Error choosing folder: " + e.message);
+    }
+}
+
+function setPackSourceFolder(folderPath, folderName) {
+    selectedPackSourceDir = folderPath;
+    const name = folderName || folderPath.split(/[\\/]/).pop() || "Custom Game";
+
+    if (packSourcePath) packSourcePath.textContent = folderPath;
+    if (packSourcePreview) packSourcePreview.style.display = "block";
+    if (packDropzoneTitle) packDropzoneTitle.textContent = "Folder: " + name;
+
+    if (packTitleInput && (!packTitleInput.value || packTitleInput.value.trim() === "")) {
+        packTitleInput.value = name;
+    }
+
+    if (packDestInput && (!packDestInput.value || packDestInput.value.trim() === "")) {
+        packDestInput.value = folderPath + ".nup";
+    }
+
+    const packSourceDetected = document.getElementById("pack-source-detected");
+    if (packSourceDetected) packSourceDetected.innerHTML = "";
+
+    if (isNative) {
+        nativeCall("inspect_pack_source", { sourceDir: folderPath }).then(res => {
+            if (res && res.packages && res.packages.length > 0 && packSourceDetected) {
+                packSourceDetected.innerHTML = "";
+                res.packages.forEach(p => {
+                    const pill = document.createElement("span");
+                    pill.className = "badge-tag";
+                    let icon = "🎮";
+                    let style = "background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.4); color: var(--switch-blue);";
+                    if (p.kind === 1) { // Update
+                        icon = "🔄";
+                        style = "background: rgba(234, 179, 8, 0.15); border-color: rgba(234, 179, 8, 0.4); color: #eab308;";
+                    } else if (p.kind === 2 || p.kind === 3) { // DLC
+                        icon = "💎";
+                        style = "background: rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.4); color: #a855f7;";
+                    }
+                    pill.setAttribute("style", style);
+                    const label = p.kind === 1 ? `Update (${p.versionStr})` : (p.kind === 2 ? `DLC` : `Base Game`);
+                    pill.textContent = `${icon} ${label}`;
+                    packSourceDetected.appendChild(pill);
+                });
+            }
+        }).catch(() => {});
+    }
+}
+
+async function browsePackDestination() {
+    if (!isNative) {
+        showToast("Save file dialog available in desktop app");
+        return;
+    }
+    try {
+        const defaultName = (packTitleInput && packTitleInput.value.trim()) || "game";
+        const res = await nativeCall("browse_pack_output", { defaultName });
+        if (res && res.path && packDestInput) {
+            packDestInput.value = res.path;
+        }
+    } catch (e) {
+        showToast("Error selecting destination: " + e.message);
+    }
+}
+
+async function startPackaging() {
+    if (!selectedPackSourceDir) {
+        alert("Please select a game source folder to pack!");
+        return;
+    }
+
+    const outputPath = packDestInput ? packDestInput.value.trim() : "";
+    if (!outputPath) {
+        alert("Please select an output .NUP destination file path!");
+        return;
+    }
+
+    const titleName = (packTitleInput && packTitleInput.value.trim()) || "Custom Game";
+    const publisher = (packPublisherInput && packPublisherInput.value.trim()) || "Homebrew / Mod";
+    const titleId = (packTitleIdInput && packTitleIdInput.value.trim()) || "0100000000001000";
+    const version = (packVersionInput && packVersionInput.value.trim()) || "1.0.0";
+    const compRadio = document.querySelector("input[name='pack-compression']:checked");
+    const compressionLevel = compRadio ? parseInt(compRadio.value, 10) : 3;
+
+    lastPackedOutputFile = outputPath;
+    packStartTime = Date.now();
+    packSmoothedEta = null;
+
+    // Reset Modal
+    if (packModalPct) packModalPct.textContent = "0%";
+    if (packProgressBar) packProgressBar.style.width = "0%";
+    if (packCurrentFile) packCurrentFile.textContent = "Scanning directory structure...";
+    if (packStatsFiles) packStatsFiles.textContent = "0 / 0 files";
+    if (packStatsBytes) packStatsBytes.textContent = "0 B / 0 B";
+    if (packLogBox) packLogBox.innerHTML = "";
+    if (btnPackModalOpenFolder) btnPackModalOpenFolder.style.display = "none";
+    if (btnPackModalClose) btnPackModalClose.style.display = "none";
+    if (btnPackModalCancel) btnPackModalCancel.style.display = "inline-flex";
+
+    if (packModal) packModal.classList.add("active");
+    addLogEntry(packLogBox, `Starting packaging for "${titleName}"...`, "info");
+
+    if (isNative) {
+        try {
+            await nativeCall("start_pack", {
+                sourceDir: selectedPackSourceDir,
+                outputPath: outputPath,
+                titleName: titleName,
+                publisher: publisher,
+                titleId: titleId,
+                version: version,
+                compressionLevel: compressionLevel
+            });
+        } catch (e) {
+            onPackError({ error: e.message });
+        }
+    } else {
+        alert("Packaging is supported in desktop app mode.");
+    }
+}
+
+function onPackProgress(info) {
+    if (!info) return;
+    const pct = Math.round(info.percent || 0);
+
+    if (packModalPct) packModalPct.textContent = `${pct}%`;
+    if (packProgressBar) packProgressBar.style.width = `${pct}%`;
+
+    if (packCurrentFile && info.currentFile) {
+        packCurrentFile.textContent = info.currentFile;
+    }
+
+    const packedBytes = info.bytesProcessed || 0;
+    const totalBytes = info.totalBytes || 0;
+    const filesPacked = info.filesPacked || 0;
+    const totalFiles = info.totalFiles || 0;
+
+    let etaResult = { etaStr: "", smoothedEta: packSmoothedEta };
+    if (totalBytes > 0 && packedBytes > 0) {
+        etaResult = calculateEta(packStartTime, packedBytes, totalBytes, packSmoothedEta);
+    } else if (totalFiles > 0 && filesPacked > 0) {
+        etaResult = calculateEta(packStartTime, filesPacked, totalFiles, packSmoothedEta);
+    }
+    packSmoothedEta = etaResult.smoothedEta;
+
+    const etaSuffix = etaResult.etaStr ? ` • ~${etaResult.etaStr} remaining` : "";
+
+    if (packStatsFiles && totalFiles) {
+        packStatsFiles.textContent = `${filesPacked} / ${totalFiles} files${etaSuffix}`;
+    }
+
+    if (packStatsBytes) {
+        const procStr = formatBytes(packedBytes);
+        const totStr = formatBytes(totalBytes);
+        const speed = info.speedFormatted ? ` [${info.speedFormatted}]` : "";
+        const ratio = info.compressionRatio > 0 ? ` (${info.compressionRatio}% saved)` : "";
+        packStatsBytes.textContent = `${procStr} / ${totStr}${ratio}${speed}`;
+    }
+
+    if (packLogBox && info.currentFile && info.status === "packing") {
+        if (info.filesPacked % 10 === 0 || info.filesPacked === info.totalFiles) {
+            addLogEntry(packLogBox, `[PACK] ${info.currentFile}`, "success");
+        }
+    }
+}
+
+function onPackDone(msg) {
+    const elapsedSec = (msg && typeof msg.elapsedSeconds === "number" && msg.elapsedSeconds > 0)
+        ? msg.elapsedSeconds
+        : (packStartTime ? Math.max(0.1, (Date.now() - packStartTime) / 1000.0) : 0);
+    const timeSpent = formatDuration(elapsedSec);
+
+    if (packModalPct) packModalPct.textContent = "100%";
+    if (packProgressBar) packProgressBar.style.width = "100%";
+    if (packCurrentFile) packCurrentFile.textContent = `✓ NUP Container built in ${timeSpent}!`;
+    if (packStatsFiles) packStatsFiles.textContent = `Finished packaging • Took ${timeSpent}`;
+
+    if (btnPackModalOpenFolder) btnPackModalOpenFolder.style.display = "inline-flex";
+    if (btnPackModalClose) btnPackModalClose.style.display = "inline-flex";
+    if (btnPackModalCancel) btnPackModalCancel.style.display = "none";
+
+    if (packLogBox) {
+        addLogEntry(packLogBox, `✓ Container generated in ${timeSpent} and verified cleanly!`, "success");
+    }
+
+    showToast(`NUP Container built in ${timeSpent}!`);
+}
+
+function onPackError(msg) {
+    if (packCurrentFile) packCurrentFile.textContent = "Packaging Error: " + (msg.error || "Unknown error");
+    if (btnPackModalClose) btnPackModalClose.style.display = "inline-flex";
+    if (btnPackModalCancel) btnPackModalCancel.style.display = "none";
+    if (packLogBox) {
+        addLogEntry(packLogBox, "ERROR: " + (msg.error || "Packaging failed"), "error");
     }
 }
 
@@ -948,6 +1295,8 @@ async function startExtraction() {
 
 async function executeExtraction(nupPath, dest, mode, openWhenDone) {
     lastExtractedDest = dest;
+    extractStartTime = Date.now();
+    extractSmoothedEta = null;
 
     // Reset modal
     extractModalPct.textContent = "0%";
@@ -1025,9 +1374,20 @@ function onExtractProgress(info) {
 
     const clampedPct = Math.min(100, Math.max(0, Math.round(rawPct * 10) / 10));
 
+    // Calculate ETA
+    let etaResult = { etaStr: "", smoothedEta: extractSmoothedEta };
+    if (totalBytes > 0 && bytesWritten > 0) {
+        etaResult = calculateEta(extractStartTime, bytesWritten, totalBytes, extractSmoothedEta);
+    } else if (total > 0 && current > 0) {
+        etaResult = calculateEta(extractStartTime, current, total, extractSmoothedEta);
+    }
+    extractSmoothedEta = etaResult.smoothedEta;
+
+    const etaSuffix = etaResult.etaStr ? ` • ~${etaResult.etaStr} remaining` : "";
+
     extractProgressBar.style.width = `${clampedPct}%`;
     extractModalPct.textContent = `${clampedPct}%`;
-    extractStatsFiles.textContent = `Extracted ${current} of ${total} files`;
+    extractStatsFiles.textContent = `Extracted ${current} of ${total} files${etaSuffix}`;
     extractStatsBytes.textContent = `${formatBytes(bytesWritten)} / ${formatBytes(totalBytes)}`;
     extractCurrentFile.textContent = fileName;
 
@@ -1037,13 +1397,20 @@ function onExtractProgress(info) {
 }
 
 function onExtractDone(msg) {
+    const elapsedSec = (msg && typeof msg.elapsedSeconds === "number" && msg.elapsedSeconds > 0)
+        ? msg.elapsedSeconds
+        : (extractStartTime ? Math.max(0.1, (Date.now() - extractStartTime) / 1000.0) : 0);
+    const timeSpent = formatDuration(elapsedSec);
+
     extractProgressBar.style.width = "100%";
     extractModalPct.textContent = "100%";
-    extractCurrentFile.textContent = "✓ Extraction completed successfully!";
+    extractCurrentFile.textContent = `✓ Extraction completed in ${timeSpent}!`;
+    extractStatsFiles.textContent = `Extracted all files • Took ${timeSpent}`;
     const dest = (msg && (msg.destDir || msg.dest_dir || msg.DestDir)) || lastExtractedDest || "Destination";
-    addLogEntry(extractLogBox, `✓ All files extracted to: ${dest}`, "success");
+    addLogEntry(extractLogBox, `✓ Completed in ${timeSpent}. All files extracted to: ${dest}`, "success");
     btnModalOpenFolder.style.display = "inline-flex";
     btnModalClose.style.display = "inline-flex";
+    showToast(`Extraction finished in ${timeSpent}!`);
 }
 
 function onExtractError(msg) {
@@ -1144,10 +1511,16 @@ function onVerifyError(msg) {
 }
 
 function addLogEntry(box, text, type = "") {
+    if (!box) return;
     const entry = document.createElement("div");
     entry.className = `log-entry ${type}`;
     entry.textContent = text;
     box.appendChild(entry);
+
+    if (box.childElementCount > 300) {
+        box.removeChild(box.firstElementChild);
+    }
+
     box.scrollTop = box.scrollHeight;
 }
 
@@ -1157,6 +1530,78 @@ function formatBytes(bytes) {
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
     if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB";
     return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+}
+
+function formatDuration(seconds) {
+    if (typeof seconds !== "number" || isNaN(seconds) || seconds < 0 || !isFinite(seconds)) {
+        return "0s";
+    }
+    if (seconds < 0.1) {
+        return "< 0.1s";
+    }
+    if (seconds < 10) {
+        return `${seconds.toFixed(1)}s`;
+    }
+    const totalSec = Math.round(seconds);
+    if (totalSec < 60) {
+        return `${totalSec}s`;
+    }
+    const mins = Math.floor(totalSec / 60);
+    const remSec = totalSec % 60;
+    if (mins < 60) {
+        return remSec > 0 ? `${mins}m ${remSec}s` : `${mins}m`;
+    }
+    const hours = Math.floor(mins / 60);
+    const remMin = mins % 60;
+    return remMin > 0 ? `${hours}h ${remMin}m` : `${hours}h`;
+}
+
+function formatEta(seconds) {
+    if (typeof seconds !== "number" || isNaN(seconds) || seconds <= 0 || !isFinite(seconds)) {
+        return "";
+    }
+    const totalSec = Math.round(seconds);
+    if (totalSec < 2) {
+        return "< 2s";
+    }
+    if (totalSec < 60) {
+        return `${totalSec}s`;
+    }
+    const mins = Math.floor(totalSec / 60);
+    const remSec = totalSec % 60;
+    if (mins < 60) {
+        return remSec > 0 ? `${mins}m ${remSec}s` : `${mins}m`;
+    }
+    const hours = Math.floor(mins / 60);
+    const remMin = mins % 60;
+    return remMin > 0 ? `${hours}h ${remMin}m` : `${hours}h`;
+}
+
+function calculateEta(startTimeMs, currentWork, totalWork, lastSmoothedEta) {
+    if (!startTimeMs || currentWork <= 0 || totalWork <= 0 || currentWork >= totalWork) {
+        return { etaStr: "", smoothedEta: null };
+    }
+    const elapsedSec = (Date.now() - startTimeMs) / 1000.0;
+    if (elapsedSec < 0.6) {
+        return { etaStr: "", smoothedEta: null };
+    }
+    const fraction = currentWork / totalWork;
+    if (fraction <= 0 || fraction >= 1.0) {
+        return { etaStr: "", smoothedEta: null };
+    }
+    const ratePerSec = fraction / elapsedSec;
+    if (ratePerSec <= 0) {
+        return { etaStr: "", smoothedEta: null };
+    }
+    const rawRemainingSec = (1.0 - fraction) / ratePerSec;
+    const smoothed = (lastSmoothedEta == null)
+        ? rawRemainingSec
+        : (lastSmoothedEta * 0.7) + (rawRemainingSec * 0.3);
+
+    return {
+        etaStr: formatEta(smoothed),
+        smoothedEta: smoothed
+    };
 }
 
 function copyText(elementId) {
