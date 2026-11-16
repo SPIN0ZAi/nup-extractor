@@ -16,7 +16,7 @@ public class PackOptions
     public string OutputFilePath { get; set; } = "";
     public string TitleName { get; set; } = "Custom Game";
     public string Publisher { get; set; } = "Homebrew / Mod";
-    public ulong TitleId { get; set; } = 0x0100000000001000UL;
+    public ulong TitleId { get; set; } = 0;
     public string VersionString { get; set; } = "1.0.0";
     public int CompressionLevel { get; set; } = 3; // 0 = Raw, 1-19 = Zstd
     public string? IconPath { get; set; }
@@ -63,6 +63,20 @@ public static class NupWriter
         public byte Codec { get; set; } = NupConstants.CodecRaw;
     }
 
+    private class DiscoveredPackage
+    {
+        public byte Kind { get; set; }
+        public string SourcePath { get; set; } = "";
+        public ulong TitleId { get; set; }
+        public uint Version { get; set; }
+        public byte Flags { get; set; }
+        public string DisplayName { get; set; } = "";
+        public DirEntry? RootDir { get; set; }
+        public uint ExeFsDirIndex { get; set; } = NupConstants.NoDir;
+        public uint RomFsDirIndex { get; set; } = NupConstants.NoDir;
+        public byte[] MetaBytes { get; set; } = Array.Empty<byte>();
+    }
+
     public static void Pack(PackOptions options, IProgress<PackProgressInfo>? progress = null, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(options.SourceDirectory) || !Directory.Exists(options.SourceDirectory))
@@ -75,38 +89,54 @@ public static class NupWriter
         if (!string.IsNullOrEmpty(outDir))
             Directory.CreateDirectory(outDir);
 
-        // 1. Scan directory structure
+        // 1. Discover packages (base, updates, dlc, or single package)
+        var discoveredPackages = DiscoverPackages(options);
+
+        string discoveryMsg = discoveredPackages.Count > 1
+            ? $"Found {discoveredPackages.Count} packages: {string.Join(", ", discoveredPackages.Select(p => p.Kind == NupConstants.KindBase ? "Base" : p.Kind == NupConstants.KindUpdate ? $"Update (v{p.Version >> 16}.{(p.Version >> 8) & 0xFF}.{p.Version & 0xFF})" : "DLC"))}..."
+            : "Scanning directory hierarchy...";
+
         progress?.Report(new PackProgressInfo
         {
             Status = "scanning",
-            CurrentFile = "Scanning directory hierarchy...",
+            CurrentFile = discoveryMsg,
             Percent = 0.0
         });
 
         var dirs = new List<DirEntry>();
         var files = new List<FileEntry>();
-
-        var rootDir = new DirEntry
-        {
-            Index = 0,
-            Name = "",
-            FullPath = Path.GetFullPath(options.SourceDirectory)
-        };
-        dirs.Add(rootDir);
-
         ulong totalUncompressedBytes = 0;
-        ScanDirectory(rootDir, dirs, files, ref totalUncompressedBytes, ct);
 
-        uint exeFsDirIndex = NupConstants.NoDir;
-        uint romFsDirIndex = NupConstants.NoDir;
-
-        for (int i = 1; i < dirs.Count; i++)
+        foreach (var pkg in discoveredPackages)
         {
-            if (string.Equals(dirs[i].Name, "exefs", StringComparison.OrdinalIgnoreCase))
-                exeFsDirIndex = (uint)i;
-            else if (string.Equals(dirs[i].Name, "romfs", StringComparison.OrdinalIgnoreCase))
-                romFsDirIndex = (uint)i;
+            var pkgRoot = new DirEntry
+            {
+                Index = dirs.Count,
+                Name = "",
+                FullPath = Path.GetFullPath(pkg.SourcePath)
+            };
+            dirs.Add(pkgRoot);
+            pkg.RootDir = pkgRoot;
+
+            ScanDirectory(pkgRoot, dirs, files, ref totalUncompressedBytes, ct);
+
+            // Locate exefs and romfs among pkgRoot direct subdirectories
+            foreach (int childDirIdx in pkgRoot.SubDirIndices)
+            {
+                var childDir = dirs[childDirIdx];
+                if (string.Equals(childDir.Name, "exefs", StringComparison.OrdinalIgnoreCase) && SubtreeHasFiles(childDir, dirs))
+                {
+                    pkg.ExeFsDirIndex = (uint)childDirIdx;
+                }
+                else if (string.Equals(childDir.Name, "romfs", StringComparison.OrdinalIgnoreCase) && SubtreeHasFiles(childDir, dirs))
+                {
+                    pkg.RomFsDirIndex = (uint)childDirIdx;
+                }
+            }
         }
+
+        if (files.Count == 0)
+            throw new InvalidOperationException($"No packable files found in '{options.SourceDirectory}'.");
 
         // 2. Build String Pool
         var stringPoolStream = new MemoryStream();
@@ -148,20 +178,24 @@ public static class NupWriter
                 childrenList.Add((uint)(dirs.Count + fileIdx));
         }
 
-        // 4. Build Metadata TLV block
-        byte[] metaBytes = BuildMetadataBlock(options);
+        // 4. Build Metadata TLV block for each package
+        int totalMetaSize = 0;
+        foreach (var pkg in discoveredPackages)
+        {
+            pkg.MetaBytes = BuildPackageMetadataBlock(pkg, options);
+            totalMetaSize += pkg.MetaBytes.Length;
+        }
 
         // 5. Calculate TOC size and layout
         const int superblockSize = NupConstants.HeaderSize; // 0x80 = 128 bytes
         const int tocHeaderSize = 48;
-        int packagesSize = 1 * NupConstants.PkgSize; // 1 package
+        int packagesSize = discoveredPackages.Count * NupConstants.PkgSize;
         int dirsTableSize = dirs.Count * NupConstants.DirSize;
         int filesTableSize = files.Count * NupConstants.FileSize;
         int childrenTableSize = childrenList.Count * 4;
         int poolSize = stringPool.Length;
-        int metaSize = metaBytes.Length;
 
-        int tocSize = tocHeaderSize + packagesSize + dirsTableSize + filesTableSize + childrenTableSize + poolSize + metaSize;
+        int tocSize = tocHeaderSize + packagesSize + dirsTableSize + filesTableSize + childrenTableSize + poolSize + totalMetaSize;
         ulong tocOffset = superblockSize; // 128
         ulong blobOffset = AlignUp(tocOffset + (ulong)tocSize, (ulong)NupConstants.ExtentAlign);
 
@@ -341,7 +375,7 @@ public static class NupWriter
         tocSpan[2] = (byte)'C';
         tocSpan[3] = 1;
 
-        BinaryPrimitives.WriteUInt32LittleEndian(tocSpan.Slice(4, 4), 1); // 1 package
+        BinaryPrimitives.WriteUInt32LittleEndian(tocSpan.Slice(4, 4), (uint)discoveredPackages.Count);
         BinaryPrimitives.WriteUInt64LittleEndian(tocSpan.Slice(8, 8), (ulong)dirs.Count);
         BinaryPrimitives.WriteUInt64LittleEndian(tocSpan.Slice(16, 8), (ulong)files.Count);
 
@@ -351,24 +385,36 @@ public static class NupWriter
 
         int pos = tocHeaderSize;
 
-        // 7.2 Package Entry (64 bytes)
-        var pSpan = tocSpan.Slice(pos, NupConstants.PkgSize);
-        pos += NupConstants.PkgSize;
+        // 7.2 Packages Table (64 bytes each)
+        ulong currentMetaOffsetInFile = tocOffset + poolOffsetInToc + (ulong)poolSize;
 
-        BinaryPrimitives.WriteUInt64LittleEndian(pSpan.Slice(0, 8), options.TitleId);
-        BinaryPrimitives.WriteUInt32LittleEndian(pSpan.Slice(8, 4), 0); // RootDir
-        BinaryPrimitives.WriteUInt32LittleEndian(pSpan.Slice(12, 4), exeFsDirIndex);
-        BinaryPrimitives.WriteUInt32LittleEndian(pSpan.Slice(16, 4), romFsDirIndex);
+        for (int p = 0; p < discoveredPackages.Count; p++)
+        {
+            var pkg = discoveredPackages[p];
+            var pSpan = tocSpan.Slice(pos, NupConstants.PkgSize);
+            pos += NupConstants.PkgSize;
 
-        uint versionInt = ParseVersionString(options.VersionString);
-        BinaryPrimitives.WriteUInt32LittleEndian(pSpan.Slice(20, 4), versionInt);
+            BinaryPrimitives.WriteUInt64LittleEndian(pSpan.Slice(0, 8), pkg.TitleId);
+            BinaryPrimitives.WriteUInt32LittleEndian(pSpan.Slice(8, 4), (uint)pkg.RootDir!.Index);
+            BinaryPrimitives.WriteUInt32LittleEndian(pSpan.Slice(12, 4), pkg.ExeFsDirIndex);
+            BinaryPrimitives.WriteUInt32LittleEndian(pSpan.Slice(16, 4), pkg.RomFsDirIndex);
+            BinaryPrimitives.WriteUInt32LittleEndian(pSpan.Slice(20, 4), pkg.Version);
 
-        pSpan[24] = NupConstants.KindBase;
-        pSpan[25] = 0; // Flags
+            pSpan[24] = pkg.Kind;
+            pSpan[25] = pkg.Flags;
 
-        ulong metaOffsetInFile = tocOffset + poolOffsetInToc + (ulong)poolSize;
-        BinaryPrimitives.WriteUInt64LittleEndian(pSpan.Slice(32, 8), metaOffsetInFile);
-        BinaryPrimitives.WriteUInt32LittleEndian(pSpan.Slice(40, 4), (uint)metaSize);
+            if (pkg.MetaBytes.Length > 0)
+            {
+                BinaryPrimitives.WriteUInt64LittleEndian(pSpan.Slice(32, 8), currentMetaOffsetInFile);
+                BinaryPrimitives.WriteUInt32LittleEndian(pSpan.Slice(40, 4), (uint)pkg.MetaBytes.Length);
+                currentMetaOffsetInFile += (ulong)pkg.MetaBytes.Length;
+            }
+            else
+            {
+                BinaryPrimitives.WriteUInt64LittleEndian(pSpan.Slice(32, 8), 0);
+                BinaryPrimitives.WriteUInt32LittleEndian(pSpan.Slice(40, 4), 0);
+            }
+        }
 
         // 7.3 Directories Table
         for (int i = 0; i < dirs.Count; i++)
@@ -412,8 +458,14 @@ public static class NupWriter
         pos += poolSize;
 
         // 7.7 Metadata TLVs
-        metaBytes.CopyTo(tocSpan.Slice(pos, metaSize));
-        pos += metaSize;
+        foreach (var pkg in discoveredPackages)
+        {
+            if (pkg.MetaBytes.Length > 0)
+            {
+                pkg.MetaBytes.CopyTo(tocSpan.Slice(pos, pkg.MetaBytes.Length));
+                pos += pkg.MetaBytes.Length;
+            }
+        }
 
         // Calculate TOC SHA-256
         byte[] tocSha256 = SHA256.HashData(tocBytes);
@@ -440,10 +492,10 @@ public static class NupWriter
 
         BinaryPrimitives.WriteUInt64LittleEndian(hSpan.Slice(56, 8), blobOffset);
         BinaryPrimitives.WriteUInt64LittleEndian(hSpan.Slice(64, 8), totalFileSize);
-        BinaryPrimitives.WriteUInt32LittleEndian(hSpan.Slice(72, 4), 1); // 1 package
+        BinaryPrimitives.WriteUInt32LittleEndian(hSpan.Slice(72, 4), (uint)discoveredPackages.Count);
         BinaryPrimitives.WriteUInt32LittleEndian(hSpan.Slice(76, 4), 0); // Flags
 
-        byte[] uuid = Guid.NewGuid().ToByteArray();
+        byte[] uuid = DeriveUuid(discoveredPackages);
         uuid.CopyTo(hSpan.Slice(80, 16));
 
         fs.Seek(0, SeekOrigin.Begin);
@@ -458,7 +510,9 @@ public static class NupWriter
         progress?.Report(new PackProgressInfo
         {
             Status = "done",
-            CurrentFile = "Container created successfully!",
+            CurrentFile = discoveredPackages.Count > 1
+                ? $"Container created with {discoveredPackages.Count} packages!"
+                : "Container created successfully!",
             FilesPacked = files.Count,
             TotalFiles = files.Count,
             BytesProcessed = totalUncompressedBytes,
@@ -499,6 +553,9 @@ public static class NupWriter
         foreach (var lf in localFiles)
         {
             var fi = new FileInfo(lf);
+            if (string.Equals(fi.Name, ".listing", StringComparison.OrdinalIgnoreCase))
+                continue;
+
             var fe = new FileEntry
             {
                 Index = files.Count,
@@ -512,28 +569,363 @@ public static class NupWriter
         }
     }
 
-    private static byte[] BuildMetadataBlock(PackOptions options)
+    private static bool SubtreeHasFiles(DirEntry d, List<DirEntry> dirs)
+    {
+        if (d.FileIndices.Count > 0) return true;
+        foreach (int subIdx in d.SubDirIndices)
+        {
+            if (SubtreeHasFiles(dirs[subIdx], dirs))
+                return true;
+        }
+        return false;
+    }
+
+    private static bool DirectoryHasFiles(string dir)
+    {
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
+            {
+                string name = Path.GetFileName(file);
+                if (!string.Equals(name, ".listing", StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    private static ulong TryParseNpdmProgramId(string packageDir)
+    {
+        string[] candidates = {
+            Path.Combine(packageDir, "exefs", "main.npdm"),
+            Path.Combine(packageDir, "main.npdm")
+        };
+        foreach (var cand in candidates)
+        {
+            if (File.Exists(cand))
+            {
+                try
+                {
+                    byte[] data = File.ReadAllBytes(cand);
+                    ReadOnlySpan<byte> aci0 = "ACI0"u8;
+                    int off = data.AsSpan().IndexOf(aci0);
+                    if (off >= 0 && off + 0x18 <= data.Length)
+                    {
+                        ulong pid = BinaryPrimitives.ReadUInt64LittleEndian(data.AsSpan().Slice(off + 0x10, 8));
+                        if (pid != 0) return pid;
+                    }
+                }
+                catch { }
+            }
+        }
+        return 0;
+    }
+
+    private static byte[]? TryReadBuildId(string packageDir)
+    {
+        string[] candidates = {
+            Path.Combine(packageDir, "exefs", "main"),
+            Path.Combine(packageDir, "main")
+        };
+        foreach (var cand in candidates)
+        {
+            if (File.Exists(cand))
+            {
+                try
+                {
+                    using var s = File.OpenRead(cand);
+                    if (s.Length >= 0x60)
+                    {
+                        byte[] head = new byte[0x60];
+                        s.ReadExactly(head);
+                        if ((head[0] == 'N' && head[1] == 'S' && head[2] == 'O' && head[3] == '0') ||
+                            (head[0x10] == 'N' && head[0x11] == 'R' && head[0x12] == 'O' && head[0x13] == '0'))
+                        {
+                            byte[] buildId = new byte[32];
+                            Array.Copy(head, 0x40, buildId, 0, 32);
+                            return buildId;
+                        }
+                    }
+                }
+                catch { }
+            }
+        }
+        return null;
+    }
+
+    private static byte[] DeriveUuid(List<DiscoveredPackage> packages)
+    {
+        using var sha = SHA256.Create();
+        byte[] buffer = new byte[13];
+        foreach (var pkg in packages)
+        {
+            BinaryPrimitives.WriteUInt64LittleEndian(buffer.AsSpan(0, 8), pkg.TitleId);
+            BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(8, 4), pkg.Version);
+            buffer[12] = pkg.Kind;
+            sha.TransformBlock(buffer, 0, 13, null, 0);
+        }
+        sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+        byte[] uuid = new byte[16];
+        Array.Copy(sha.Hash!, 0, uuid, 0, 16);
+        return uuid;
+    }
+
+    private static List<DiscoveredPackage> DiscoverPackages(PackOptions options)
+    {
+        var list = new List<DiscoveredPackage>();
+        string src = Path.GetFullPath(options.SourceDirectory);
+
+        string baseDir = Path.Combine(src, "base");
+        string updatesDir = Path.Combine(src, "updates");
+        string dlcDir = Path.Combine(src, "dlc");
+
+        bool hasBase = Directory.Exists(baseDir) && DirectoryHasFiles(baseDir);
+        bool hasUpdates = Directory.Exists(updatesDir) && DirectoryHasFiles(updatesDir);
+        bool hasDlc = Directory.Exists(dlcDir) && DirectoryHasFiles(dlcDir);
+
+        ulong baseTitleId = options.TitleId;
+
+        if (hasBase)
+        {
+            ulong npdmId = TryParseNpdmProgramId(baseDir);
+            if (npdmId != 0 && (baseTitleId == 0 || baseTitleId == 0x0100000000001000UL))
+                baseTitleId = npdmId;
+
+            if (baseTitleId == 0)
+                baseTitleId = 0x0100000000001000UL;
+
+            uint baseVer = ParseVersionString(options.VersionString);
+
+            list.Add(new DiscoveredPackage
+            {
+                Kind = NupConstants.KindBase,
+                SourcePath = baseDir,
+                TitleId = baseTitleId,
+                Version = baseVer,
+                Flags = 0,
+                DisplayName = options.TitleName
+            });
+        }
+
+        if (hasUpdates)
+        {
+            byte updateFlags = hasBase ? (byte)0 : NupConstants.PkgFlagStandaloneUpdate;
+
+            string[] subDirs = Directory.GetDirectories(updatesDir);
+            Array.Sort(subDirs, StringComparer.OrdinalIgnoreCase);
+
+            var validUpdateDirs = new List<string>();
+            foreach (var d in subDirs)
+            {
+                if (DirectoryHasFiles(d))
+                    validUpdateDirs.Add(d);
+            }
+
+            if (validUpdateDirs.Count > 0)
+            {
+                foreach (var updSub in validUpdateDirs)
+                {
+                    string folderName = Path.GetFileName(updSub);
+                    uint ver = 0;
+                    if (uint.TryParse(folderName, out uint parsedVer))
+                    {
+                        ver = parsedVer;
+                    }
+                    else
+                    {
+                        ver = ParseVersionString(folderName);
+                        if (ver == 0) ver = 65536;
+                    }
+
+                    ulong updTitleId = TryParseNpdmProgramId(updSub);
+                    if (updTitleId == 0)
+                    {
+                        if (baseTitleId != 0 && (baseTitleId & 0xFFF) == 0)
+                            updTitleId = baseTitleId | 0x800;
+                        else if (baseTitleId != 0)
+                            updTitleId = baseTitleId;
+                        else
+                            updTitleId = options.TitleId;
+                    }
+
+                    list.Add(new DiscoveredPackage
+                    {
+                        Kind = NupConstants.KindUpdate,
+                        SourcePath = updSub,
+                        TitleId = updTitleId,
+                        Version = ver,
+                        Flags = updateFlags,
+                        DisplayName = $"{options.TitleName} (Update v{folderName})"
+                    });
+                }
+            }
+            else if (DirectoryHasFiles(updatesDir))
+            {
+                ulong updTitleId = TryParseNpdmProgramId(updatesDir);
+                if (updTitleId == 0)
+                {
+                    if (baseTitleId != 0 && (baseTitleId & 0xFFF) == 0)
+                        updTitleId = baseTitleId | 0x800;
+                    else
+                        updTitleId = baseTitleId != 0 ? baseTitleId : options.TitleId;
+                }
+
+                list.Add(new DiscoveredPackage
+                {
+                    Kind = NupConstants.KindUpdate,
+                    SourcePath = updatesDir,
+                    TitleId = updTitleId,
+                    Version = 65536,
+                    Flags = updateFlags,
+                    DisplayName = $"{options.TitleName} (Update)"
+                });
+            }
+        }
+
+        if (hasDlc)
+        {
+            string[] dlcSubs = Directory.GetDirectories(dlcDir);
+            Array.Sort(dlcSubs, StringComparer.OrdinalIgnoreCase);
+
+            int dlcCounter = 1;
+            foreach (var sub in dlcSubs)
+            {
+                string name = Path.GetFileName(sub);
+                if (name.Length == 16 && ulong.TryParse(name, System.Globalization.NumberStyles.HexNumber, null, out ulong hexId))
+                {
+                    string[] idxDirs = Directory.GetDirectories(sub);
+                    Array.Sort(idxDirs, StringComparer.OrdinalIgnoreCase);
+                    var validIdxDirs = new List<string>();
+                    foreach (var idir in idxDirs)
+                    {
+                        if (DirectoryHasFiles(idir))
+                            validIdxDirs.Add(idir);
+                    }
+
+                    if (validIdxDirs.Count > 0)
+                    {
+                        foreach (var idxDir in validIdxDirs)
+                        {
+                            list.Add(new DiscoveredPackage
+                            {
+                                Kind = NupConstants.KindAddon,
+                                SourcePath = idxDir,
+                                TitleId = hexId,
+                                Version = 0,
+                                Flags = 0,
+                                DisplayName = $"{options.TitleName} (DLC {name})"
+                            });
+                        }
+                    }
+                    else if (DirectoryHasFiles(sub))
+                    {
+                        list.Add(new DiscoveredPackage
+                        {
+                            Kind = NupConstants.KindAddon,
+                            SourcePath = sub,
+                            TitleId = hexId,
+                            Version = 0,
+                            Flags = 0,
+                            DisplayName = $"{options.TitleName} (DLC {name})"
+                        });
+                    }
+                }
+                else if (DirectoryHasFiles(sub))
+                {
+                    ulong dlcTitleId = baseTitleId != 0 ? (baseTitleId + (ulong)dlcCounter) : (options.TitleId + (ulong)dlcCounter);
+                    list.Add(new DiscoveredPackage
+                    {
+                        Kind = NupConstants.KindAddon,
+                        SourcePath = sub,
+                        TitleId = dlcTitleId,
+                        Version = 0,
+                        Flags = 0,
+                        DisplayName = $"{options.TitleName} (DLC {name})"
+                    });
+                    dlcCounter++;
+                }
+            }
+        }
+
+        // Fallback to single content directory
+        if (list.Count == 0)
+        {
+            ulong npdmId = TryParseNpdmProgramId(src);
+            ulong titleId = options.TitleId != 0 ? options.TitleId : (npdmId != 0 ? npdmId : 0x0100000000001000UL);
+
+            list.Add(new DiscoveredPackage
+            {
+                Kind = NupConstants.KindBase,
+                SourcePath = src,
+                TitleId = titleId,
+                Version = ParseVersionString(options.VersionString),
+                Flags = 0,
+                DisplayName = options.TitleName
+            });
+        }
+
+        return list;
+    }
+
+    private static byte[] BuildPackageMetadataBlock(DiscoveredPackage pkg, PackOptions options)
     {
         using var ms = new MemoryStream();
 
-        // TlvTitleName = 0x0005
-        WriteTlv(ms, NupConstants.TlvTitleName, Encoding.UTF8.GetBytes(options.TitleName));
-
-        // TlvPublisher = 0x0006
-        WriteTlv(ms, NupConstants.TlvPublisher, Encoding.UTF8.GetBytes(options.Publisher));
-
-        // TlvDisplayVersion = 0x0004
-        WriteTlv(ms, NupConstants.TlvDisplayVersion, Encoding.UTF8.GetBytes(options.VersionString));
-
-        // TlvIcon = 0x0003
-        if (!string.IsNullOrEmpty(options.IconPath) && File.Exists(options.IconPath))
+        if (pkg.Kind == NupConstants.KindBase)
         {
-            try
+            if (!string.IsNullOrEmpty(options.TitleName))
+                WriteTlv(ms, NupConstants.TlvTitleName, Encoding.UTF8.GetBytes(options.TitleName));
+
+            if (!string.IsNullOrEmpty(options.Publisher))
+                WriteTlv(ms, NupConstants.TlvPublisher, Encoding.UTF8.GetBytes(options.Publisher));
+
+            if (!string.IsNullOrEmpty(options.VersionString))
+                WriteTlv(ms, NupConstants.TlvDisplayVersion, Encoding.UTF8.GetBytes(options.VersionString));
+
+            if (!string.IsNullOrEmpty(options.IconPath) && File.Exists(options.IconPath))
             {
-                byte[] iconBytes = File.ReadAllBytes(options.IconPath);
-                WriteTlv(ms, NupConstants.TlvIcon, iconBytes);
+                try
+                {
+                    byte[] iconBytes = File.ReadAllBytes(options.IconPath);
+                    WriteTlv(ms, NupConstants.TlvIcon, iconBytes);
+                }
+                catch { }
             }
-            catch { }
+        }
+        else if (pkg.Kind == NupConstants.KindUpdate)
+        {
+            string updateVerStr = $"{pkg.Version >> 16}.{(pkg.Version >> 8) & 0xFF}.{pkg.Version & 0xFF}";
+            WriteTlv(ms, NupConstants.TlvDisplayVersion, Encoding.UTF8.GetBytes(updateVerStr));
+        }
+
+        // TlvSourceDump = 0x0008 (provenance)
+        WriteTlv(ms, NupConstants.TlvSourceDump, Encoding.UTF8.GetBytes("NUP Extractor Native"));
+
+        // TlvNpdm = 0x0001
+        string[] npdmCandidates = {
+            Path.Combine(pkg.SourcePath, "exefs", "main.npdm"),
+            Path.Combine(pkg.SourcePath, "main.npdm")
+        };
+        foreach (var nc in npdmCandidates)
+        {
+            if (File.Exists(nc))
+            {
+                try
+                {
+                    byte[] npdm = File.ReadAllBytes(nc);
+                    WriteTlv(ms, NupConstants.TlvNpdm, npdm);
+                    break;
+                }
+                catch { }
+            }
+        }
+
+        // TlvBuildId = 0x0007
+        byte[]? buildId = TryReadBuildId(pkg.SourcePath);
+        if (buildId != null)
+        {
+            WriteTlv(ms, NupConstants.TlvBuildId, buildId);
         }
 
         return ms.ToArray();
@@ -575,5 +967,27 @@ public static class NupWriter
     {
         ulong remainder = value % alignment;
         return remainder == 0 ? value : value + (alignment - remainder);
+    }
+
+    public static List<Dictionary<string, object>> DetectPackageSummary(string sourceDirectory)
+    {
+        var result = new List<Dictionary<string, object>>();
+        try
+        {
+            var pkgs = DiscoverPackages(new PackOptions { SourceDirectory = sourceDirectory });
+            foreach (var p in pkgs)
+            {
+                result.Add(new Dictionary<string, object>
+                {
+                    ["kind"] = (int)p.Kind,
+                    ["kindName"] = NupConstants.GetKindName(p.Kind),
+                    ["displayName"] = p.DisplayName,
+                    ["titleIdHex"] = $"{p.TitleId:X16}",
+                    ["versionStr"] = $"{p.Version >> 16}.{(p.Version >> 8) & 0xFF}.{p.Version & 0xFF}"
+                });
+            }
+        }
+        catch { }
+        return result;
     }
 }

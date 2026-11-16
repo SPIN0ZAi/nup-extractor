@@ -224,6 +224,10 @@ public partial class MainWindow : Window
                     HandleBrowsePackOutput(id, root);
                     break;
 
+                case "inspect_pack_source":
+                    HandleInspectPackSource(id, root);
+                    break;
+
                 case "start_pack":
                     HandleStartPack(id, root);
                     break;
@@ -685,6 +689,32 @@ public partial class MainWindow : Window
             success = result == true,
             path = result == true ? sfd.FileName : null
         });
+    }
+
+    private void HandleInspectPackSource(string id, JsonElement root)
+    {
+        string? sourceDir = GetString(root, "sourceDir", "source_dir");
+        if (!string.IsNullOrWhiteSpace(sourceDir) && Directory.Exists(sourceDir))
+        {
+            var pkgs = NupWriter.DetectPackageSummary(sourceDir);
+            SendIpcResponse(new
+            {
+                id,
+                action = "inspect_pack_source_result",
+                success = true,
+                packages = pkgs
+            });
+        }
+        else
+        {
+            SendIpcResponse(new
+            {
+                id,
+                action = "inspect_pack_source_result",
+                success = false,
+                packages = Array.Empty<object>()
+            });
+        }
     }
 
     private void HandleStartPack(string id, JsonElement root)

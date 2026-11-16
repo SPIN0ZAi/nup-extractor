@@ -563,6 +563,141 @@ public class NupTests
     }
 
     [Fact]
+    public void Test_NupWriter_MultiPackage_BaseAndUpdatesRoundTrip()
+    {
+        string tempBase = Path.Combine(Path.GetTempPath(), "nup_multipkg_test_" + Guid.NewGuid().ToString("N"));
+        string extractedDir = Path.Combine(tempBase, "extracted");
+        string repackedNup = Path.Combine(tempBase, "repacked.nup");
+        string reExtractedDir = Path.Combine(tempBase, "re_extracted");
+
+        try
+        {
+            Directory.CreateDirectory(extractedDir);
+
+            // 1. Extract sample_game.nup (which has Base + Update)
+            NupEngine.Extract(SampleNupPath, extractedDir, "all", null, null, new Progress<ProgressInfo>(_ => { }), CancellationToken.None);
+
+            Assert.True(Directory.Exists(Path.Combine(extractedDir, "base")));
+            Assert.True(Directory.Exists(Path.Combine(extractedDir, "updates", "65536")));
+
+            // 2. Re-pack the multi-package dump directory
+            var options = new PackOptions
+            {
+                SourceDirectory = extractedDir,
+                OutputFilePath = repackedNup,
+                TitleName = "Sample NX Adventure",
+                TitleId = 0x0100123456789ABCUL,
+                Publisher = "Nintendo",
+                CompressionLevel = 3
+            };
+
+            NupWriter.Pack(options);
+            Assert.True(File.Exists(repackedNup));
+
+            // 3. Inspect re-packed container
+            using var reader = new NupReader(repackedNup);
+            Assert.Equal(2, reader.Packages.Count);
+
+            var basePkg = reader.Packages[0];
+            Assert.Equal(NupConstants.KindBase, basePkg.Kind);
+            Assert.Equal("base", basePkg.KindName);
+            Assert.Equal("0100123456789ABC", basePkg.TitleIdHex);
+
+            var updPkg = reader.Packages[1];
+            Assert.Equal(NupConstants.KindUpdate, updPkg.Kind);
+            Assert.Equal("update", updPkg.KindName);
+            Assert.Equal(65536u, updPkg.Version);
+
+            // 4. Verify integrity
+            VerifyProgressInfo? vResult = null;
+            NupEngine.Verify(repackedNup, deep: true, new SyncProgress<VerifyProgressInfo>(p => { if (p.Status == "done") vResult = p; }), CancellationToken.None);
+            Assert.NotNull(vResult);
+            Assert.True(vResult.Valid);
+            Assert.Empty(vResult.Problems);
+
+            // 5. Re-extract and verify file equality
+            NupEngine.Extract(repackedNup, reExtractedDir, "all", null, null, new Progress<ProgressInfo>(_ => { }), CancellationToken.None);
+
+            byte[] originalPatchNotes = File.ReadAllBytes(Path.Combine(extractedDir, "updates", "65536", "romfs", "data", "patch_notes.txt"));
+            byte[] repackedPatchNotes = File.ReadAllBytes(Path.Combine(reExtractedDir, "updates", "65536", "romfs", "data", "patch_notes.txt"));
+            Assert.Equal(originalPatchNotes, repackedPatchNotes);
+
+            byte[] originalConfig = File.ReadAllBytes(Path.Combine(extractedDir, "base", "romfs", "data", "config.json"));
+            byte[] repackedConfig = File.ReadAllBytes(Path.Combine(reExtractedDir, "base", "romfs", "data", "config.json"));
+            Assert.Equal(originalConfig, repackedConfig);
+        }
+        finally
+        {
+            try { if (Directory.Exists(tempBase)) Directory.Delete(tempBase, true); } catch { }
+        }
+    }
+
+    [Fact]
+    public void Test_NupWriter_MultiPackage_BundleWithDLC()
+    {
+        string tempBase = Path.Combine(Path.GetTempPath(), "nup_dlc_test_" + Guid.NewGuid().ToString("N"));
+        string bundleDir = Path.Combine(tempBase, "bundle");
+        string outNup = Path.Combine(tempBase, "game_with_dlc.nup");
+
+        try
+        {
+            // Create Base content
+            string baseRomfs = Path.Combine(bundleDir, "base", "romfs");
+            Directory.CreateDirectory(baseRomfs);
+            File.WriteAllText(Path.Combine(baseRomfs, "main_data.bin"), "Base game data");
+
+            // Create Update content (v131072 -> v2.0.0)
+            string updRomfs = Path.Combine(bundleDir, "updates", "131072", "romfs");
+            Directory.CreateDirectory(updRomfs);
+            File.WriteAllText(Path.Combine(updRomfs, "update_data.bin"), "Update 2.0 data");
+
+            // Create DLC content (SPEC 3.1.2: dlc/<16-hex title id>/<index>/)
+            string dlcRomfs = Path.Combine(bundleDir, "dlc", "0100123456789001", "0", "romfs");
+            Directory.CreateDirectory(dlcRomfs);
+            File.WriteAllText(Path.Combine(dlcRomfs, "dlc_costume.bin"), "DLC costume data");
+
+            var options = new PackOptions
+            {
+                SourceDirectory = bundleDir,
+                OutputFilePath = outNup,
+                TitleName = "Adventure Game",
+                TitleId = 0x0100123456789000UL,
+                VersionString = "1.0.0",
+                CompressionLevel = 3
+            };
+
+            NupWriter.Pack(options);
+            Assert.True(File.Exists(outNup));
+
+            using var reader = new NupReader(outNup);
+            Assert.Equal(3, reader.Packages.Count);
+
+            // Package 0: Base
+            Assert.Equal(NupConstants.KindBase, reader.Packages[0].Kind);
+            Assert.Equal("0100123456789000", reader.Packages[0].TitleIdHex);
+
+            // Package 1: Update
+            Assert.Equal(NupConstants.KindUpdate, reader.Packages[1].Kind);
+            Assert.Equal(131072u, reader.Packages[1].Version);
+
+            // Package 2: Addon / DLC
+            Assert.Equal(NupConstants.KindAddon, reader.Packages[2].Kind);
+            Assert.Equal("0100123456789001", reader.Packages[2].TitleIdHex);
+
+            // Deep verify
+            VerifyProgressInfo? vResult = null;
+            NupEngine.Verify(outNup, deep: true, new SyncProgress<VerifyProgressInfo>(p => { if (p.Status == "done") vResult = p; }), CancellationToken.None);
+            Assert.NotNull(vResult);
+            Assert.True(vResult.Valid);
+            Assert.Empty(vResult.Problems);
+        }
+        finally
+        {
+            try { if (Directory.Exists(tempBase)) Directory.Delete(tempBase, true); } catch { }
+        }
+    }
+
+    [Fact]
     public void Test_Extraction_And_Packaging_TrackElapsedSeconds()
     {
         string tempDir = Path.Combine(Path.GetTempPath(), "nup_elapsed_test_" + Guid.NewGuid().ToString("N"));

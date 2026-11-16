@@ -630,6 +630,34 @@ function setPackSourceFolder(folderPath, folderName) {
     if (packDestInput && (!packDestInput.value || packDestInput.value.trim() === "")) {
         packDestInput.value = folderPath + ".nup";
     }
+
+    const packSourceDetected = document.getElementById("pack-source-detected");
+    if (packSourceDetected) packSourceDetected.innerHTML = "";
+
+    if (isNative) {
+        nativeCall("inspect_pack_source", { sourceDir: folderPath }).then(res => {
+            if (res && res.packages && res.packages.length > 0 && packSourceDetected) {
+                packSourceDetected.innerHTML = "";
+                res.packages.forEach(p => {
+                    const pill = document.createElement("span");
+                    pill.className = "badge-tag";
+                    let icon = "🎮";
+                    let style = "background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.4); color: var(--switch-blue);";
+                    if (p.kind === 1) { // Update
+                        icon = "🔄";
+                        style = "background: rgba(234, 179, 8, 0.15); border-color: rgba(234, 179, 8, 0.4); color: #eab308;";
+                    } else if (p.kind === 2 || p.kind === 3) { // DLC
+                        icon = "💎";
+                        style = "background: rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.4); color: #a855f7;";
+                    }
+                    pill.setAttribute("style", style);
+                    const label = p.kind === 1 ? `Update (${p.versionStr})` : (p.kind === 2 ? `DLC` : `Base Game`);
+                    pill.textContent = `${icon} ${label}`;
+                    packSourceDetected.appendChild(pill);
+                });
+            }
+        }).catch(() => {});
+    }
 }
 
 async function browsePackDestination() {
