@@ -481,7 +481,23 @@ where
                         NupConstants::KIND_BASE => "base".to_string(),
                         NupConstants::KIND_UPDATE => format!("updates/{}", pkg.version),
                         NupConstants::KIND_ADDON | NupConstants::KIND_ADDON_UPDATE => {
-                            format!("dlc/{}/{}", pkg.title_id_hex().to_lowercase(), pkg.index)
+                            let use_version = pkg.version != 0
+                                && reader
+                                    .packages
+                                    .iter()
+                                    .filter(|other| {
+                                        other.kind == pkg.kind
+                                            && other.title_id == pkg.title_id
+                                            && other.version == pkg.version
+                                    })
+                                    .count()
+                                    == 1;
+                            let suffix = if use_version {
+                                pkg.version as usize
+                            } else {
+                                pkg.index
+                            };
+                            format!("dlc/{}/{}", pkg.title_id_hex().to_lowercase(), suffix)
                         }
                         _ => format!("pkg_{}_{}", pkg.index, pkg.kind_name()),
                     }

@@ -336,14 +336,9 @@ fn main() {
             source_dir,
             output_nup,
         } => {
-            let title = Path::new(&source_dir)
-                .file_name()
-                .map(|s| s.to_string_lossy().into_owned())
-                .unwrap_or_else(|| "Custom Game".to_string());
             let opt = PackOptions {
                 source_directory: source_dir.clone(),
                 output_file_path: output_nup,
-                title_name: title,
                 ..PackOptions::default()
             };
             if let Err(e) = pack(&opt, |_| {}, &cancel) {
@@ -368,7 +363,6 @@ fn main() {
             let opt = PackOptions {
                 source_directory: source_dir.clone(),
                 output_file_path: out,
-                title_name: name,
                 ..PackOptions::default()
             };
             match pack(&opt, |_| {}, &cancel) {

@@ -545,21 +545,29 @@ impl IpcRouter {
 
             "inspect_pack_source" => {
                 let src = get_str(&root, &["sourceDir", "source_dir"]).unwrap_or_default();
-                if !src.trim().is_empty() && Path::new(&src).is_dir() {
-                    let pkgs = detect_package_summary(&src);
-                    self.sink.send_json(json!({
-                        "id": id,
-                        "action": "inspect_pack_source_result",
-                        "success": true,
-                        "packages": pkgs
-                    }));
+                let sink = Arc::clone(&self.sink);
+                let run = move || {
+                    if !src.trim().is_empty() && Path::new(&src).is_dir() {
+                        let pkgs = detect_package_summary(&src);
+                        sink.send_json(json!({
+                            "id": id,
+                            "action": "inspect_pack_source_result",
+                            "success": true,
+                            "packages": pkgs
+                        }));
+                    } else {
+                        sink.send_json(json!({
+                            "id": id,
+                            "action": "inspect_pack_source_result",
+                            "success": false,
+                            "packages": []
+                        }));
+                    }
+                };
+                if spawn_bg {
+                    std::thread::spawn(run);
                 } else {
-                    self.sink.send_json(json!({
-                        "id": id,
-                        "action": "inspect_pack_source_result",
-                        "success": false,
-                        "packages": []
-                    }));
+                    run();
                 }
             }
 
@@ -581,19 +589,12 @@ impl IpcRouter {
                     }));
                     return;
                 }
-                let default_title = Path::new(&source_dir)
-                    .file_name()
-                    .map(|n| n.to_string_lossy().into_owned())
-                    .unwrap_or_else(|| "Custom Game".to_string());
-                let title_name =
-                    get_str(&root, &["titleName", "title_name"]).unwrap_or(default_title);
-                let publisher =
-                    get_str(&root, &["publisher"]).unwrap_or_else(|| "Homebrew / Mod".to_string());
-                let version_str =
-                    get_str(&root, &["version"]).unwrap_or_else(|| "1.0.0".to_string());
+                let title_name = get_str(&root, &["titleName", "title_name"]).unwrap_or_default();
+                let publisher = get_str(&root, &["publisher"]).unwrap_or_default();
+                let version_str = get_str(&root, &["version"]).unwrap_or_default();
                 let compression_level =
                     get_i64(&root, &["compressionLevel", "compression_level"]).unwrap_or(3) as i32;
-                let mut title_id = 0x0100_0000_0000_1000u64;
+                let mut title_id = 0u64;
                 if let Some(tid_s) = get_str(&root, &["titleId", "title_id"]) {
                     let clean = tid_s
                         .trim()

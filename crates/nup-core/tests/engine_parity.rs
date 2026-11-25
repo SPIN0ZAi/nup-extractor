@@ -8,8 +8,8 @@ use std::sync::atomic::AtomicBool;
 use nup_core::path_safety::validate_and_join_extraction_path;
 use nup_core::{
     NupConstants, NupReader, PackOptions, PackProgressInfo, ProgressInfo, VerifyProgressInfo,
-    check_disk_space, extract, extract_single_file, get_dir_children, inspect, pack, search_files,
-    verify,
+    check_disk_space, detect_package_summary, extract, extract_single_file, get_dir_children,
+    inspect, pack, search_files, verify,
 };
 use proptest::prelude::*;
 use sha2::{Digest, Sha256};
@@ -571,6 +571,509 @@ fn test_large_file_count_10k_tiny_files_stress() {
     )
     .unwrap();
     assert!(verify_done.unwrap().valid);
+}
+
+#[test]
+fn test_writer_lichii_compat_zero_byte_npdm_nacp_fcs_and_sort_order() {
+    let tmp = tempfile::tempdir().unwrap();
+    let src = tmp.path().join("Switch2Game");
+    fs::create_dir_all(src.join("exefs")).unwrap();
+    fs::create_dir_all(src.join("romfs/DirUpper")).unwrap();
+    fs::create_dir_all(src.join("romfs/dir_lower")).unwrap();
+
+    // Minimal ExeFS main (NSO0 + 32-byte Build ID at 0x40..0x60)
+    let mut main_nso = vec![0u8; 0x100];
+    main_nso[0..4].copy_from_slice(b"NSO0");
+    main_nso[0x40..0x60].fill(0x5A);
+    fs::write(src.join("exefs/main"), &main_nso).unwrap();
+
+    // Minimal main.npdm with Switch 2 Program ID at ACI0 + 0x10
+    let switch2_pid: u64 = 0x0400_74A0_1BF1_2000;
+    let mut npdm = vec![0u8; 0x100];
+    npdm[0x80..0x84].copy_from_slice(b"ACI0");
+    npdm[0x90..0x98].copy_from_slice(&switch2_pid.to_le_bytes());
+    fs::write(src.join("exefs/main.npdm"), &npdm).unwrap();
+
+    // Valid 16 KiB NACP + sidecar icon
+    let mut nacp = vec![0u8; 0x4000];
+    let title_b = b"Bananza Test";
+    nacp[..title_b.len()].copy_from_slice(title_b);
+    let pub_b = b"Nintendo";
+    nacp[0x200..0x200 + pub_b.len()].copy_from_slice(pub_b);
+    let ver_b = b"3.2.0";
+    nacp[0x3060..0x3060 + ver_b.len()].copy_from_slice(ver_b);
+    fs::write(src.join("control.nacp"), &nacp).unwrap();
+    let fake_icon = vec![0x89u8, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
+    fs::write(src.join("icon_AmericanEnglish.dat"), &fake_icon).unwrap();
+
+    // Mixed children inside romfs/ including empty files, compressible data, incompressible data, duplicate data
+    let compressible = vec![b'Z'; 16_384];
+    let mut incompressible = vec![0u8; 4096];
+    let mut prng: u64 = 0x9E37_79B9_7F4A_7C15;
+    let (incomp_chunks, _) = incompressible.as_chunks_mut::<8>();
+    for chunk in incomp_chunks {
+        prng ^= prng << 13;
+        prng ^= prng >> 7;
+        prng ^= prng << 17;
+        *chunk = prng.to_le_bytes();
+    }
+    fs::write(src.join("romfs/DirUpper/nested.txt"), b"upper dir").unwrap();
+    fs::write(src.join("romfs/dir_lower/nested.txt"), b"lower dir").unwrap();
+    fs::write(src.join("romfs/Z_comp.json"), &compressible).unwrap();
+    fs::write(src.join("romfs/Z_comp_dup.json"), &compressible).unwrap();
+    fs::write(src.join("romfs/_empty_mid.bin"), []).unwrap();
+    fs::write(src.join("romfs/a_incomp.zs"), &incompressible).unwrap();
+    fs::write(src.join("romfs/z_empty_end.bin"), []).unwrap();
+
+    let out_nup = tmp.path().join("bananza.nup");
+    let cancel = AtomicBool::new(false);
+    pack(
+        &PackOptions {
+            source_directory: pstr(&src),
+            output_file_path: pstr(&out_nup),
+            title_name: String::new(),
+            publisher: String::new(),
+            // Simulate UI placeholder sent directly: real NPDM ID must still win!
+            title_id: 0x0100_0000_0000_1000,
+            version_string: String::new(),
+            compression_level: 3,
+            icon_path: None,
+        },
+        |_| {},
+        &cancel,
+    )
+    .unwrap();
+
+    let reader = NupReader::open(&out_nup).unwrap();
+    assert_eq!(reader.packages.len(), 1);
+    let pkg = &reader.packages[0];
+    assert_eq!(pkg.title_id, switch2_pid);
+    assert_ne!(pkg.exe_fs_dir, NupConstants::NO_DIR);
+    assert_ne!(pkg.rom_fs_dir, NupConstants::NO_DIR);
+
+    // Metadata block sits after blob region (compatible with both SPEC §5 and Lichii UpdateMetadata)
+    let toc_end = reader.superblock.toc_offset + reader.superblock.toc_size;
+    assert!(pkg.meta_offset >= toc_end);
+    assert_eq!(
+        pkg.meta_offset + u64::from(pkg.meta_size),
+        reader.superblock.file_size
+    );
+
+    let meta = reader.get_package_metadata(pkg);
+    assert_eq!(meta[&NupConstants::TLV_NPDM], npdm);
+    assert_eq!(meta[&NupConstants::TLV_NACP], nacp);
+    assert_eq!(meta[&NupConstants::TLV_ICON], fake_icon);
+    assert_eq!(meta[&NupConstants::TLV_TITLE_NAME], title_b);
+    assert_eq!(meta[&NupConstants::TLV_PUBLISHER], pub_b);
+    assert_eq!(meta[&NupConstants::TLV_DISPLAY_VERSION], ver_b);
+    assert_eq!(meta[&NupConstants::TLV_BUILD_ID], vec![0x5Au8; 32]);
+
+    // SPEC §3.3: every directory's children sorted in bytewise UTF-8 lexicographic order (dirs & files mixed!)
+    let romfs_children: Vec<String> = reader
+        .get_children(pkg.rom_fs_dir)
+        .into_iter()
+        .map(|(_, _, name)| name)
+        .collect();
+    let mut expected_sorted = romfs_children.clone();
+    expected_sorted.sort_by(|a, b| a.as_bytes().cmp(b.as_bytes()));
+    assert_eq!(romfs_children, expected_sorted);
+    assert_eq!(
+        romfs_children,
+        vec![
+            "DirUpper",
+            "Z_comp.json",
+            "Z_comp_dup.json",
+            "_empty_mid.bin",
+            "a_incomp.zs",
+            "dir_lower",
+            "z_empty_end.bin",
+        ]
+    );
+
+    // Zero-byte rule (SPEC §3.6 & Lichii Parse): extent_offset == 0, extent_size == 0, codec == RAW
+    for empty_name in ["_empty_mid.bin", "z_empty_end.bin"] {
+        let f = reader.files.iter().find(|f| f.name == empty_name).unwrap();
+        assert_eq!(f.size, 0);
+        assert_eq!(
+            f.extent_offset, 0,
+            "{empty_name} must have extent_offset == 0"
+        );
+        assert_eq!(f.extent_size, 0);
+        assert_eq!(f.codec, NupConstants::CODEC_RAW);
+    }
+
+    // Zstd frame MUST embed FrameContentSize matching uncompressed size (SPEC §4.1)
+    let comp_idx = reader
+        .files
+        .iter()
+        .position(|f| f.name == "Z_comp.json")
+        .unwrap();
+    let dup_idx = reader
+        .files
+        .iter()
+        .position(|f| f.name == "Z_comp_dup.json")
+        .unwrap();
+    assert_eq!(reader.files[comp_idx].codec, NupConstants::CODEC_ZSTD);
+    assert_eq!(
+        reader.files[comp_idx].extent_offset,
+        reader.files[dup_idx].extent_offset
+    );
+    let (_, zstd_extent) = reader.extent_slice(comp_idx).unwrap();
+    let fcs = zstd::zstd_safe::get_frame_content_size(zstd_extent).unwrap();
+    assert_eq!(fcs, Some(compressible.len() as u64));
+
+    // Incompressible .zs falls back to RAW without corrupting anything
+    let zs_f = reader
+        .files
+        .iter()
+        .find(|f| f.name == "a_incomp.zs")
+        .unwrap();
+    assert_eq!(zs_f.codec, NupConstants::CODEC_RAW);
+    assert_eq!(zs_f.extent_size, incompressible.len() as u64);
+
+    // Deep verify passes
+    let mut verify_done: Option<VerifyProgressInfo> = None;
+    verify(
+        &pstr(&out_nup),
+        true,
+        |p| {
+            if p.status == "done" {
+                verify_done = Some(p);
+            }
+        },
+        &cancel,
+    )
+    .unwrap();
+    assert!(verify_done.unwrap().valid);
+}
+
+#[test]
+fn test_writer_base_at_root_with_updates_and_dlc_preserved() {
+    let tmp = tempfile::tempdir().unwrap();
+    let src = tmp.path().join("RootGameWithDlc");
+    fs::create_dir_all(src.join("exefs")).unwrap();
+    fs::create_dir_all(src.join("romfs")).unwrap();
+    fs::create_dir_all(src.join("updates/65536/romfs")).unwrap();
+    fs::create_dir_all(src.join("dlc/0100ABCDEF123401/0/romfs")).unwrap();
+
+    let mut npdm = vec![0u8; 0x100];
+    npdm[0x80..0x84].copy_from_slice(b"ACI0");
+    npdm[0x90..0x98].copy_from_slice(&0x0100_ABCD_EF12_3000u64.to_le_bytes());
+    fs::write(src.join("exefs/main"), b"main_exec").unwrap();
+    fs::write(src.join("exefs/main.npdm"), &npdm).unwrap();
+    fs::write(src.join("romfs/base.dat"), b"base payload").unwrap();
+    fs::write(src.join("updates/65536/romfs/upd.dat"), b"upd payload").unwrap();
+    fs::write(
+        src.join("dlc/0100ABCDEF123401/0/romfs/dlc.dat"),
+        b"dlc payload",
+    )
+    .unwrap();
+
+    let out = tmp.path().join("combined.nup");
+    let cancel = AtomicBool::new(false);
+    pack(
+        &PackOptions {
+            source_directory: pstr(&src),
+            output_file_path: pstr(&out),
+            ..PackOptions::default()
+        },
+        |_| {},
+        &cancel,
+    )
+    .unwrap();
+
+    let reader = NupReader::open(&out).unwrap();
+    assert_eq!(reader.packages.len(), 3);
+    assert_eq!(reader.packages[0].kind, NupConstants::KIND_BASE);
+    assert_eq!(reader.packages[0].title_id_hex(), "0100ABCDEF123000");
+    assert_eq!(reader.packages[1].kind, NupConstants::KIND_UPDATE);
+    assert_eq!(reader.packages[1].flags, 0);
+    assert_eq!(reader.packages[2].kind, NupConstants::KIND_ADDON);
+    assert_eq!(reader.packages[2].title_id_hex(), "0100ABCDEF123401");
+
+    // Base root must NOT contain updates/ or dlc/ subdirectories
+    let base_children: Vec<String> = reader
+        .get_children(reader.packages[0].root_dir)
+        .into_iter()
+        .map(|(_, _, n)| n)
+        .collect();
+    assert_eq!(base_children, vec!["exefs", "romfs"]);
+}
+
+#[test]
+fn test_writer_streaming_large_file_path_compressible_and_incompressible() {
+    let tmp = tempfile::tempdir().unwrap();
+    let src = tmp.path().join("large_src");
+    fs::create_dir_all(src.join("romfs")).unwrap();
+
+    // > 16 MiB compressible and > 16 MiB incompressible (`.zs` simulation)
+    let large_size = 17 * 1024 * 1024usize;
+    let large_comp = vec![0x42u8; large_size];
+    let mut large_incomp = vec![0u8; large_size];
+    let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
+    let (chunks, _) = large_incomp.as_chunks_mut::<8>();
+    for chunk in chunks {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        *chunk = state.to_le_bytes();
+    }
+    fs::write(src.join("romfs/big_comp.dat"), &large_comp).unwrap();
+    fs::write(src.join("romfs/big_incomp.zs"), &large_incomp).unwrap();
+
+    let out = tmp.path().join("large.nup");
+    let cancel = AtomicBool::new(false);
+    pack(
+        &PackOptions {
+            source_directory: pstr(&src),
+            output_file_path: pstr(&out),
+            compression_level: 3,
+            ..PackOptions::default()
+        },
+        |_| {},
+        &cancel,
+    )
+    .unwrap();
+
+    let reader = NupReader::open(&out).unwrap();
+    assert_eq!(reader.files.len(), 2);
+
+    let comp_idx = reader
+        .files
+        .iter()
+        .position(|f| f.name == "big_comp.dat")
+        .unwrap();
+    let incomp_idx = reader
+        .files
+        .iter()
+        .position(|f| f.name == "big_incomp.zs")
+        .unwrap();
+    assert_eq!(reader.files[comp_idx].codec, NupConstants::CODEC_ZSTD);
+    assert_eq!(reader.files[incomp_idx].codec, NupConstants::CODEC_RAW);
+    assert_eq!(reader.files[incomp_idx].extent_size, large_size as u64);
+
+    // Streaming Zstd path MUST also embed exact FrameContentSize
+    let (_, z_ext) = reader.extent_slice(comp_idx).unwrap();
+    assert_eq!(
+        zstd::zstd_safe::get_frame_content_size(z_ext).unwrap(),
+        Some(large_size as u64)
+    );
+
+    let mut verify_done: Option<VerifyProgressInfo> = None;
+    verify(
+        &pstr(&out),
+        true,
+        |p| {
+            if p.status == "done" {
+                verify_done = Some(p);
+            }
+        },
+        &cancel,
+    )
+    .unwrap();
+    assert!(verify_done.unwrap().valid);
+}
+
+#[test]
+fn test_writer_game_and_dlc_versions_and_layouts_roundtrip() {
+    let tmp = tempfile::tempdir().unwrap();
+    let src = tmp.path().join("BananzaBundle");
+
+    let switch2_pid: u64 = 0x0400_ABCD_0001_2001;
+    let mut npdm = vec![0u8; 0x100];
+    npdm[0x80..0x84].copy_from_slice(b"ACI0");
+    npdm[0x90..0x98].copy_from_slice(&switch2_pid.to_le_bytes());
+
+    // Base: Product.100 -> 1.0.0, Update 458752 -> GameDataList.Product.320.* -> 3.2.0
+    fs::create_dir_all(src.join("base/exefs")).unwrap();
+    fs::create_dir_all(src.join("base/romfs/GameData")).unwrap();
+    fs::write(src.join("base/exefs/main"), b"base_main").unwrap();
+    fs::write(src.join("base/exefs/main.npdm"), &npdm).unwrap();
+    fs::write(
+        src.join("base/romfs/GameData/GameDataList.Product.100.byml.zs"),
+        b"v1",
+    )
+    .unwrap();
+    fs::write(
+        src.join("base/romfs/GameData/GameDataList.Product.rsizetable.zs"),
+        b"unversioned",
+    )
+    .unwrap();
+
+    fs::create_dir_all(src.join("updates/458752/exefs")).unwrap();
+    fs::create_dir_all(src.join("updates/458752/romfs/GameData")).unwrap();
+    fs::write(src.join("updates/458752/exefs/main"), b"upd_main").unwrap();
+    fs::write(src.join("updates/458752/exefs/main.npdm"), &npdm).unwrap();
+    fs::write(
+        src.join("updates/458752/romfs/GameData/GameDataList.Product.320.byml.zs"),
+        b"v320",
+    )
+    .unwrap();
+
+    // DLC 1: Versioned Switch folder `65536` (1.0.0) with AoCUpgradeVersion 1.2.0
+    fs::create_dir_all(src.join("dlc/0100ABCD00011001/65536/romfs/System")).unwrap();
+    fs::write(
+        src.join("dlc/0100ABCD00011001/65536/romfs/System/AoCUpgradeVersion.txt"),
+        b"120",
+    )
+    .unwrap();
+
+    // DLC 2: Direct `romfs/` directly inside 16-hex TID without index subfolder
+    fs::create_dir_all(src.join("dlc/0100ABCD00011002/romfs")).unwrap();
+    fs::write(
+        src.join("dlc/0100ABCD00011002/romfs/costume.dat"),
+        b"direct",
+    )
+    .unwrap();
+
+    // DLC 3: Versioned folder `131072` (2.0.0) without NACP/Product tag
+    fs::create_dir_all(src.join("dlc/0100ABCD00011003/131072/romfs")).unwrap();
+    fs::write(
+        src.join("dlc/0100ABCD00011003/131072/romfs/pack.dat"),
+        b"v2dlc",
+    )
+    .unwrap();
+
+    // DLC 4: Non-hex folder name must derive AoC TID `(base & !0x1FFF) | 0x1000 + 1` (0400ABCD00013001)
+    fs::create_dir_all(src.join("dlc/BonusPack/romfs")).unwrap();
+    fs::write(src.join("dlc/BonusPack/romfs/bonus.dat"), b"bonus").unwrap();
+
+    let summary = detect_package_summary(&pstr(&src));
+    assert_eq!(summary.len(), 6);
+    assert_eq!(summary[0].detected_version.as_deref(), Some("1.0.0"));
+    assert_eq!(summary[1].detected_version.as_deref(), Some("3.2.0"));
+    assert_eq!(summary[2].detected_version.as_deref(), Some("1.2.0"));
+
+    let out = tmp.path().join("bananza_bundle.nup");
+    let cancel = AtomicBool::new(false);
+    pack(
+        &PackOptions {
+            source_directory: pstr(&src),
+            output_file_path: pstr(&out),
+            ..PackOptions::default()
+        },
+        |_| {},
+        &cancel,
+    )
+    .unwrap();
+
+    let reader = NupReader::open(&out).unwrap();
+    assert_eq!(reader.packages.len(), 6);
+
+    // Base uses version == 0 numerically + display_version "1.0.0"
+    let base = &reader.packages[0];
+    assert_eq!(base.kind, NupConstants::KIND_BASE);
+    assert_eq!(base.version, 0);
+    assert_eq!(
+        reader.get_package_metadata(base)[&NupConstants::TLV_DISPLAY_VERSION],
+        b"1.0.0"
+    );
+
+    // Update 458752 uses display_version "3.2.0" (NOT bit-shifted "7.0.0") and matching Title ID
+    let upd = &reader.packages[1];
+    assert_eq!(upd.kind, NupConstants::KIND_UPDATE);
+    assert_eq!(upd.version, 458752);
+    assert_eq!(upd.title_id, switch2_pid);
+    assert_eq!(
+        reader.get_package_metadata(upd)[&NupConstants::TLV_DISPLAY_VERSION],
+        b"3.2.0"
+    );
+
+    // DLCs preserve romfs_dir_index, true AoC Title IDs, and versions
+    let dlc1 = reader
+        .packages
+        .iter()
+        .find(|p| p.title_id == 0x0100_ABCD_0001_1001)
+        .unwrap();
+    assert_eq!(dlc1.version, 65536);
+    assert_eq!(
+        reader.get_package_metadata(dlc1)[&NupConstants::TLV_DISPLAY_VERSION],
+        b"1.2.0"
+    );
+
+    let dlc2 = reader
+        .packages
+        .iter()
+        .find(|p| p.title_id == 0x0100_ABCD_0001_1002)
+        .unwrap();
+    assert_ne!(
+        dlc2.rom_fs_dir,
+        NupConstants::NO_DIR,
+        "direct dlc/<tid>/romfs must preserve romfs_dir"
+    );
+
+    let dlc3 = reader
+        .packages
+        .iter()
+        .find(|p| p.title_id == 0x0100_ABCD_0001_1003)
+        .unwrap();
+    assert_eq!(dlc3.version, 131072);
+    assert_eq!(
+        reader.get_package_metadata(dlc3)[&NupConstants::TLV_DISPLAY_VERSION],
+        b"2.0.0"
+    );
+
+    let dlc4 = reader
+        .packages
+        .iter()
+        .find(|p| p.title_id == 0x0400_ABCD_0001_3001)
+        .unwrap();
+    assert_ne!(dlc4.rom_fs_dir, NupConstants::NO_DIR);
+
+    // Extract -> Repack round-trip keeps versioned DLC versions (`65536` / `131072`) intact
+    let extracted = tmp.path().join("extracted");
+    extract(
+        &pstr(&out),
+        &pstr(&extracted),
+        "all",
+        None,
+        None,
+        |_| {},
+        &cancel,
+    )
+    .unwrap();
+    assert!(
+        extracted
+            .join("dlc/0100abcd00011001/65536/romfs/System/AoCUpgradeVersion.txt")
+            .is_file()
+    );
+    assert!(
+        extracted
+            .join("dlc/0100abcd00011003/131072/romfs/pack.dat")
+            .is_file()
+    );
+
+    let repacked = tmp.path().join("repacked.nup");
+    pack(
+        &PackOptions {
+            source_directory: pstr(&extracted),
+            output_file_path: pstr(&repacked),
+            ..PackOptions::default()
+        },
+        |_| {},
+        &cancel,
+    )
+    .unwrap();
+    let r2 = NupReader::open(&repacked).unwrap();
+    let r2_upd = r2
+        .packages
+        .iter()
+        .find(|p| p.kind == NupConstants::KIND_UPDATE)
+        .unwrap();
+    assert_eq!(
+        r2.get_package_metadata(r2_upd)[&NupConstants::TLV_DISPLAY_VERSION],
+        b"3.2.0"
+    );
+    let r2_dlc3 = r2
+        .packages
+        .iter()
+        .find(|p| p.title_id == 0x0100_ABCD_0001_1003)
+        .unwrap();
+    assert_eq!(r2_dlc3.version, 131072);
+    assert_eq!(
+        r2.get_package_metadata(r2_dlc3)[&NupConstants::TLV_DISPLAY_VERSION],
+        b"2.0.0"
+    );
 }
 
 proptest! {

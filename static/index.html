@@ -386,10 +386,25 @@
                                     </button>
                                 </div>
 
+                                <div class="field-group" style="margin-top: 0.95rem;">
+                                    <label class="field-label" for="pack-source-input">Source Folder Path</label>
+                                    <div class="input-with-button">
+                                        <input id="pack-source-input" type="text" class="text-input" placeholder="Paste or type a game folder path..." />
+                                        <button id="btn-clear-pack-source" type="button" class="btn btn-secondary" title="Remove selected game folder and reset form" style="display: none;">
+                                            Clear
+                                        </button>
+                                    </div>
+                                </div>
+
                                 <div id="pack-source-preview" class="glass-inset" style="display: none; margin-top: 1rem; padding: 0.85rem;">
-                                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
                                         <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">SELECTED FOLDER</span>
-                                        <span id="pack-source-badge" class="badge-tag badge-green">Ready to Pack</span>
+                                        <div style="display: flex; align-items: center; gap: 0.45rem;">
+                                            <span id="pack-source-badge" class="badge-tag badge-green">Ready to Pack</span>
+                                            <button id="btn-remove-pack-preview" type="button" class="btn btn-ghost" style="padding: 0.2rem 0.55rem; font-size: 0.74rem; color: var(--switch-red);" title="Remove selected game folder">
+                                                ✕ Remove
+                                            </button>
+                                        </div>
                                     </div>
                                     <div id="pack-source-path" style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--switch-blue); margin-top: 0.4rem; word-break: break-all;"></div>
                                     <div id="pack-source-detected" style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;"></div>

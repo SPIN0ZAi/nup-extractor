@@ -28,7 +28,7 @@ const isNative = hostBridge.isNative;
 let nextRequestId = 1;
 const pendingRequests = new Map();
 
-function nativeCall(action, params = {}) {
+function nativeCall(action, params = {}, timeoutMs = 120000) {
     if (!isNative) {
         return Promise.reject(new Error("Native WebView2 bridge not available"));
     }
@@ -37,12 +37,14 @@ function nativeCall(action, params = {}) {
         pendingRequests.set(id, { resolve, reject });
         hostBridge.postMessage({ id, action, ...params });
 
-        setTimeout(() => {
-            if (pendingRequests.has(id)) {
-                pendingRequests.delete(id);
-                reject(new Error("Native call timed out"));
-            }
-        }, 120000);
+        if (timeoutMs > 0) {
+            setTimeout(() => {
+                if (pendingRequests.has(id)) {
+                    pendingRequests.delete(id);
+                    reject(new Error("Native call timed out"));
+                }
+            }, timeoutMs);
+        }
     });
 }
 
@@ -202,6 +204,9 @@ let activeAppMode = "extract"; // "extract" | "pack"
 const packDropzone = document.getElementById("pack-dropzone");
 const packDropzoneTitle = document.getElementById("pack-dropzone-title");
 const btnBrowsePackSource = document.getElementById("btn-browse-pack-source");
+const packSourceInput = document.getElementById("pack-source-input");
+const btnClearPackSource = document.getElementById("btn-clear-pack-source");
+const btnRemovePackPreview = document.getElementById("btn-remove-pack-preview");
 const packSourcePreview = document.getElementById("pack-source-preview");
 const packSourcePath = document.getElementById("pack-source-path");
 const packDestInput = document.getElementById("pack-dest-input");
@@ -213,6 +218,11 @@ const packVersionInput = document.getElementById("pack-version-input");
 const btnStartPack = document.getElementById("btn-start-pack");
 let selectedPackSourceDir = null;
 let lastPackedOutputFile = null;
+let lastAutoPackTitle = "";
+let lastAutoPackDest = "";
+let lastAutoPackTitleId = "";
+let lastAutoPackVersion = "";
+let packInspectSeq = 0;
 
 // Pack Modal Elements
 const packModal = document.getElementById("pack-modal");
@@ -415,7 +425,7 @@ function setupEventListeners() {
                         filePath: nupPath,
                         fileIndex: selectedContextFile.index,
                         fileName: selectedContextFile.name
-                    });
+                    }, 0);
                     if (res && res.success) {
                         showToast(`Extracted ${res.fileName || selectedContextFile.name}!`);
                     } else if (res && res.cancelled) {
@@ -530,6 +540,51 @@ function setupEventListeners() {
     // Start Packaging
     if (btnStartPack) {
         btnStartPack.addEventListener("click", startPackaging);
+    }
+
+    // Manual Pack Source Folder Path & Clear/Remove Controls
+    let manualPackInputTimer = null;
+    if (packSourceInput) {
+        const syncTypedSource = (raw, fromInput = false) => {
+            const cleaned = normalizeUserFolderPath(raw);
+            if (!cleaned) {
+                clearPackForm({ preserveInput: fromInput });
+            } else {
+                setPackSourceFolder(cleaned, null, { fromInput });
+            }
+        };
+        packSourceInput.addEventListener("input", () => {
+            clearTimeout(manualPackInputTimer);
+            const val = packSourceInput.value.trim();
+            if (!val) {
+                clearPackForm({ preserveInput: true });
+                return;
+            }
+            manualPackInputTimer = setTimeout(() => syncTypedSource(packSourceInput.value, true), 350);
+        });
+        packSourceInput.addEventListener("change", () => {
+            clearTimeout(manualPackInputTimer);
+            syncTypedSource(packSourceInput.value);
+        });
+        packSourceInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                clearTimeout(manualPackInputTimer);
+                syncTypedSource(packSourceInput.value);
+            }
+        });
+    }
+    if (btnClearPackSource) {
+        btnClearPackSource.addEventListener("click", () => {
+            clearPackForm();
+            showToast("Cleared selected game folder.");
+        });
+    }
+    if (btnRemovePackPreview) {
+        btnRemovePackPreview.addEventListener("click", () => {
+            clearPackForm();
+            showToast("Removed selected game folder.");
+        });
     }
 
     // Pack Dropzone Events
@@ -687,7 +742,7 @@ async function browsePackSourceFolder() {
         return;
     }
     try {
-        const res = await nativeCall("browse_pack_folder");
+        const res = await nativeCall("browse_pack_folder", {}, 0);
         if (res && res.path) {
             setPackSourceFolder(res.path, res.name);
         }
@@ -696,46 +751,153 @@ async function browsePackSourceFolder() {
     }
 }
 
-function setPackSourceFolder(folderPath, folderName) {
-    selectedPackSourceDir = folderPath;
-    const name = folderName || folderPath.split(/[\\/]/).pop() || "Custom Game";
+function clearPackForm(opts = {}) {
+    packInspectSeq++;
+    selectedPackSourceDir = null;
+    lastAutoPackTitle = "";
+    lastAutoPackDest = "";
+    lastAutoPackTitleId = "";
+    lastAutoPackVersion = "";
 
-    if (packSourcePath) packSourcePath.textContent = folderPath;
+    if (!opts.preserveInput && packSourceInput) packSourceInput.value = "";
+    if (btnClearPackSource) btnClearPackSource.style.display = "none";
+    if (packSourcePath) packSourcePath.textContent = "";
+    if (packSourcePreview) packSourcePreview.style.display = "none";
+    if (packDropzoneTitle) packDropzoneTitle.textContent = "Drop Game Folder Here";
+
+    const packSourceDetected = document.getElementById("pack-source-detected");
+    if (packSourceDetected) packSourceDetected.innerHTML = "";
+
+    if (packTitleInput) packTitleInput.value = "";
+    if (packPublisherInput) packPublisherInput.value = "";
+    if (packTitleIdInput) packTitleIdInput.value = "";
+    if (packVersionInput) packVersionInput.value = "";
+    if (packDestInput) packDestInput.value = "";
+}
+
+function normalizeUserFolderPath(raw) {
+    return String(raw || "")
+        .trim()
+        .replace(/^["']+|["']+$/g, "")
+        .trim()
+        .replace(/[\\/]+$/, "");
+}
+
+function setPackSourceFolder(folderPath, folderName, opts = {}) {
+    const cleanPath = normalizeUserFolderPath(folderPath);
+    if (!cleanPath) {
+        clearPackForm({ preserveInput: !!opts.fromInput });
+        return;
+    }
+
+    const prevDir = selectedPackSourceDir;
+    const isSwitchingFolder = !!prevDir && prevDir.toLowerCase() !== cleanPath.toLowerCase();
+    selectedPackSourceDir = cleanPath;
+    const name = folderName || cleanPath.split(/[\\/]/).pop() || "Custom Game";
+
+    if (!opts.fromInput && packSourceInput && normalizeUserFolderPath(packSourceInput.value) !== cleanPath) {
+        packSourceInput.value = cleanPath;
+    }
+    if (btnClearPackSource) btnClearPackSource.style.display = "inline-flex";
+    if (packSourcePath) packSourcePath.textContent = cleanPath;
     if (packSourcePreview) packSourcePreview.style.display = "block";
     if (packDropzoneTitle) packDropzoneTitle.textContent = "Folder: " + name;
 
-    if (packTitleInput && (!packTitleInput.value || packTitleInput.value.trim() === "")) {
+    const autoDest = cleanPath + ".nup";
+    if (
+        packTitleInput &&
+        (!packTitleInput.value.trim() || packTitleInput.value.trim() === lastAutoPackTitle || isSwitchingFolder)
+    ) {
         packTitleInput.value = name;
+        lastAutoPackTitle = name;
     }
 
-    if (packDestInput && (!packDestInput.value || packDestInput.value.trim() === "")) {
-        packDestInput.value = folderPath + ".nup";
+    if (
+        packDestInput &&
+        (!packDestInput.value.trim() || packDestInput.value.trim() === lastAutoPackDest || isSwitchingFolder)
+    ) {
+        packDestInput.value = autoDest;
+        lastAutoPackDest = autoDest;
+    }
+
+    if (isSwitchingFolder) {
+        if (packTitleIdInput) packTitleIdInput.value = "";
+        if (packVersionInput) packVersionInput.value = "";
+        lastAutoPackTitleId = "";
+        lastAutoPackVersion = "";
     }
 
     const packSourceDetected = document.getElementById("pack-source-detected");
     if (packSourceDetected) packSourceDetected.innerHTML = "";
 
+    const reqSeq = ++packInspectSeq;
     if (isNative) {
-        nativeCall("inspect_pack_source", { sourceDir: folderPath }).then(res => {
-            if (res && res.packages && res.packages.length > 0 && packSourceDetected) {
-                packSourceDetected.innerHTML = "";
-                res.packages.forEach(p => {
-                    const pill = document.createElement("span");
-                    pill.className = "badge-tag";
-                    let icon = "🎮";
-                    let style = "background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.4); color: var(--switch-blue);";
-                    if (p.kind === 1) { // Update
-                        icon = "🔄";
-                        style = "background: rgba(234, 179, 8, 0.15); border-color: rgba(234, 179, 8, 0.4); color: #eab308;";
-                    } else if (p.kind === 2 || p.kind === 3) { // DLC
-                        icon = "💎";
-                        style = "background: rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.4); color: #a855f7;";
-                    }
-                    pill.setAttribute("style", style);
-                    const label = p.kind === 1 ? `Update (${p.versionStr})` : (p.kind === 2 ? `DLC` : `Base Game`);
-                    pill.textContent = `${icon} ${label}`;
-                    packSourceDetected.appendChild(pill);
-                });
+        nativeCall("inspect_pack_source", { sourceDir: cleanPath }, 300000).then(res => {
+            if (reqSeq !== packInspectSeq) return;
+            if (res && res.packages && res.packages.length > 0) {
+                const primaryPkg = res.packages.find(p => p.kind === 0) || res.packages[0];
+                if (
+                    packTitleIdInput &&
+                    primaryPkg &&
+                    primaryPkg.titleIdHex &&
+                    primaryPkg.titleIdHex !== "0000000000000000" &&
+                    (!packTitleIdInput.value.trim() || packTitleIdInput.value.trim() === lastAutoPackTitleId)
+                ) {
+                    packTitleIdInput.value = primaryPkg.titleIdHex;
+                    lastAutoPackTitleId = primaryPkg.titleIdHex;
+                }
+                if (
+                    packTitleInput &&
+                    primaryPkg &&
+                    primaryPkg.detectedTitle &&
+                    (!packTitleInput.value.trim() || packTitleInput.value.trim() === lastAutoPackTitle)
+                ) {
+                    packTitleInput.value = primaryPkg.detectedTitle;
+                    lastAutoPackTitle = primaryPkg.detectedTitle;
+                }
+                if (packPublisherInput && primaryPkg && primaryPkg.detectedPublisher && !packPublisherInput.value.trim()) {
+                    packPublisherInput.value = primaryPkg.detectedPublisher;
+                }
+                const updatePkgs = res.packages.filter(p => p.kind === 1);
+                const latestUpd = updatePkgs.length > 0 ? updatePkgs[updatePkgs.length - 1] : null;
+                const autoVer = (latestUpd && (latestUpd.detectedVersion || latestUpd.versionStr))
+                    || (primaryPkg && primaryPkg.detectedVersion)
+                    || "";
+                if (
+                    packVersionInput &&
+                    autoVer &&
+                    (!packVersionInput.value.trim() || packVersionInput.value.trim() === lastAutoPackVersion)
+                ) {
+                    packVersionInput.value = autoVer;
+                    lastAutoPackVersion = autoVer;
+                }
+
+                if (packSourceDetected) {
+                    packSourceDetected.innerHTML = "";
+                    res.packages.forEach(p => {
+                        const pill = document.createElement("span");
+                        pill.className = "badge-tag";
+                        let icon = "🎮";
+                        let style = "background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.4); color: var(--switch-blue);";
+                        if (p.kind === 1) { // Update
+                            icon = "🔄";
+                            style = "background: rgba(234, 179, 8, 0.15); border-color: rgba(234, 179, 8, 0.4); color: #eab308;";
+                        } else if (p.kind === 2 || p.kind === 3) { // DLC
+                            icon = "💎";
+                            style = "background: rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.4); color: #a855f7;";
+                        }
+                        pill.setAttribute("style", style);
+                        const tidSuffix = p.titleIdHex && p.titleIdHex !== "0000000000000000" ? ` • ${p.titleIdHex}` : "";
+                        const updVer = p.detectedVersion || p.versionStr;
+                        const dlcVer = p.detectedVersion ? ` (${p.detectedVersion})` : "";
+                        const baseVer = p.detectedVersion ? ` (v${p.detectedVersion})` : "";
+                        const label = p.kind === 1
+                            ? `Update (${updVer})`
+                            : (p.kind === 2 || p.kind === 3 ? `DLC${tidSuffix}${dlcVer}` : `Base Game${tidSuffix}${baseVer}`);
+                        pill.textContent = `${icon} ${label}`;
+                        packSourceDetected.appendChild(pill);
+                    });
+                }
             }
         }).catch(() => {});
     }
@@ -748,7 +910,7 @@ async function browsePackDestination() {
     }
     try {
         const defaultName = (packTitleInput && packTitleInput.value.trim()) || "game";
-        const res = await nativeCall("browse_pack_output", { defaultName });
+        const res = await nativeCall("browse_pack_output", { defaultName }, 0);
         if (res && res.path && packDestInput) {
             packDestInput.value = res.path;
         }
@@ -758,8 +920,13 @@ async function browsePackDestination() {
 }
 
 async function startPackaging() {
-    if (!selectedPackSourceDir) {
-        alert("Please select a game source folder to pack!");
+    const typedSource = packSourceInput ? normalizeUserFolderPath(packSourceInput.value) : "";
+    if (typedSource && typedSource !== selectedPackSourceDir) {
+        setPackSourceFolder(typedSource, null, { fromInput: false });
+    }
+    const sourceDir = normalizeUserFolderPath(selectedPackSourceDir || typedSource);
+    if (!sourceDir) {
+        alert("Please select or enter a game source folder to pack!");
         return;
     }
 
@@ -769,10 +936,12 @@ async function startPackaging() {
         return;
     }
 
-    const titleName = (packTitleInput && packTitleInput.value.trim()) || "Custom Game";
-    const publisher = (packPublisherInput && packPublisherInput.value.trim()) || "Homebrew / Mod";
-    const titleId = (packTitleIdInput && packTitleIdInput.value.trim()) || "0100000000001000";
-    const version = (packVersionInput && packVersionInput.value.trim()) || "1.0.0";
+    const rawTitle = packTitleInput ? packTitleInput.value.trim() : "";
+    const titleName = (lastAutoPackTitle && rawTitle === lastAutoPackTitle) ? "" : rawTitle;
+    const publisher = packPublisherInput ? packPublisherInput.value.trim() : "";
+    const titleId = (packTitleIdInput && packTitleIdInput.value.trim()) || "";
+    const rawVer = packVersionInput ? packVersionInput.value.trim() : "";
+    const version = (lastAutoPackVersion && rawVer === lastAutoPackVersion) ? "" : rawVer;
     const compRadio = document.querySelector("input[name='pack-compression']:checked");
     const compressionLevel = compRadio ? parseInt(compRadio.value, 10) : 3;
 
@@ -796,19 +965,16 @@ async function startPackaging() {
     addLogEntry(packLogBox, `Starting packaging for "${titleName}"...`, "info");
 
     if (isNative) {
-        try {
-            await nativeCall("start_pack", {
-                sourceDir: selectedPackSourceDir,
-                outputPath: outputPath,
-                titleName: titleName,
-                publisher: publisher,
-                titleId: titleId,
-                version: version,
-                compressionLevel: compressionLevel
-            });
-        } catch (e) {
-            onPackError({ error: e.message });
-        }
+        hostBridge.postMessage({
+            action: "start_pack",
+            sourceDir: sourceDir,
+            outputPath: outputPath,
+            titleName: titleName,
+            publisher: publisher,
+            titleId: titleId,
+            version: version,
+            compressionLevel: compressionLevel
+        });
     } else {
         alert("Packaging is supported in desktop app mode.");
     }
@@ -900,7 +1066,7 @@ function onPackError(msg) {
 async function browseNativeFile() {
     try {
         if (isNative) {
-            const res = await nativeCall("browse_file");
+            const res = await nativeCall("browse_file", {}, 0);
             if (res.path) {
                 loadNup(res.path);
             }
@@ -920,7 +1086,7 @@ async function browseNativeFile() {
 async function browseNativeFolder() {
     try {
         if (isNative) {
-            const res = await nativeCall("browse_folder");
+            const res = await nativeCall("browse_folder", {}, 0);
             if (res.path) {
                 destDirInput.value = res.path;
             }
@@ -2017,11 +2183,10 @@ if (btnUpdateNow) {
         btnUpdateCancel.style.display = "inline-flex";
         btnUpdateCancel.textContent = "Cancel";
 
-        nativeCall("start_update", {
+        hostBridge.postMessage({
+            action: "start_update",
             downloadUrl: pendingUpdateData.downloadUrl,
             checksumUrl: pendingUpdateData.checksumUrl || null
-        }).catch(err => {
-            onUpdateError({ error: err.message });
         });
     });
 }
@@ -2044,7 +2209,7 @@ if (btnUpdateIgnore) {
 
 if (btnUpdateCancel) {
     btnUpdateCancel.addEventListener("click", () => {
-        nativeCall("cancel_update").catch(() => {});
+        postNativeAction("cancel_update");
         updateProgressModal.classList.remove("active");
     });
 }
