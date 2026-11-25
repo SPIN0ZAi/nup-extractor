@@ -1,0 +1,318 @@
+{
+  "contractVersion": 1,
+  "exchanges": [
+    {
+      "name": "get_app_info",
+      "request": {
+        "id": "req_1",
+        "action": "get_app_info"
+      },
+      "response": {
+        "id": "req_1",
+        "action": "app_info_result",
+        "success": true,
+        "version": "1.0.8",
+        "initialFilePath": null
+      }
+    },
+    {
+      "name": "inspect",
+      "request": {
+        "id": "req_2",
+        "action": "inspect",
+        "filePath": "\u003CREPO\u003E/sample_game.nup"
+      },
+      "response": {
+        "id": "req_2",
+        "action": "inspect_result",
+        "success": true,
+        "data": {
+          "file_path": "\u003CREPO\u003E/sample_game.nup",
+          "filePath": "\u003CREPO\u003E/sample_game.nup",
+          "file_name": "sample_game.nup",
+          "fileName": "sample_game.nup",
+          "base_name": "sample_game",
+          "baseName": "sample_game",
+          "file_size": 3570,
+          "fileSize": 3570,
+          "file_size_formatted": "3.49 KB",
+          "fileSizeFormatted": "3.49 KB",
+          "default_dest_dir": "\u003CREPO\u003E/Sample NX Adventure_extracted",
+          "defaultDestDir": "\u003CREPO\u003E/Sample NX Adventure_extracted",
+          "superblock": {
+            "magic": "NUP1",
+            "header_size": 128,
+            "headerSize": 128,
+            "header_version": 1,
+            "headerVersion": 1,
+            "toc_offset": 128,
+            "tocOffset": 128,
+            "toc_size": 921,
+            "tocSize": 921,
+            "toc_sha256": "3ec8d2ab980987d46efa9e8dd13e8f0438d9f2387225ffd707f77dd5ba503626",
+            "tocSha256": "3ec8d2ab980987d46efa9e8dd13e8f0438d9f2387225ffd707f77dd5ba503626",
+            "blob_offset": 1056,
+            "blobOffset": 1056,
+            "package_count": 2,
+            "packageCount": 2,
+            "uuid": "ba1a10e2-7b16-c849-4c52-bf26667330ca"
+          },
+          "primary_meta": {
+            "title_name": "Sample NX Adventure",
+            "titleName": "Sample NX Adventure",
+            "publisher": "Nintendo",
+            "display_version": "1.1.0",
+            "displayVersion": "1.1.0",
+            "icon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTED8xAAAH3klEQVR4nO3bW2yTZRzH8edduyMH2ToMW0OMjhGNhwhMIHgBKGpQmIiYQExEIaJRMSFRL/DGiGJMVEgELgxyiEYFogsjAxWVwwwiimg0kTgNUZlTRmEDxrbSg6klTR2jjPZ9e/p9P9lFm61dm/y/fZ6n66zq6lEGUFWQ6QcAZBIBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQJo70w/AtLa2ZPohIJO83toM/nYrI/8Qw9AjS2JIawDMPbKthDQFkGD02yxPGh4AslZV2JfBDBwPoN/RZ\u002Bgx8BgczcDZAC6cfkYfSWTgXANOBdBn9Jl7pF6CExk48ncAph\u002B26PO66cSbKPavAPGPkhd\u002B2L4U2LsO2LwCMP1wQvwrqb3rgJ0BMP3IuQZsC4DpRy42YE8ATD9ytAEbAmD6kbsN2HkG4D0fpIeNk5ZqALEEmX6kU2zeUlwEUgqAT3ciG6Qyh/ZsgXj5R/rZMnXJB8DmB3mwEeJ/giEtyQDY/SPbJDeTqa4A7P6RWSlOIFsgSEsmAI6/yJujMCsApBEApBEApF12ABwAkE/HAFYASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASMvPAArH3lTx6YeeXY0VOz9yjfQO27C65IF7o9\u002Bq/GHv0BUvRy8PXbm8ZE69MWZExxFjTMl993h2N3p2N1YFjkUvlMypL3v0ocrvdnn2bKto\u002BsA10hu9YfTnY/pcLVvwoKe5qfL7PcV3Tk3XM0aS3CYfXbHuzZMz5gWP/lVy/8yhr73Y\u002B/neolvG9GzZag0ZbALBwgnjoj9WNGHcmVdWxG7V09DU09AUHWjflEgYxXdMKX1ioe/W6eHunuLp04ZtWO27fVbiX10wvLJ0/lzf5Jnu0TXlDe\u002B0XzfR4eeKlOTnCuC6crhVUhyZ6caPu1at9e87UFg3JjLxE\u002Bt6t\u002B\u002B0ykqt4mJTWGjKSkP/tCe4n0HPPHVq6bJwd48xpnfHZ4HfjkRulVCBp7xr1VoTCgX/bC3wlNv9zGCz/FwBTi1d5mne3rN9Z/e7m/27vjSW5brmKmNZhZPG\u002B5u/Kqge4R5zowkGz31zKPH9uK\u002B/NnDox9jVzkVLLvmrA4dbAodbIhuqOfU92z6x49nAQfkZQPeG93u37iiZdffQlct7G5pOv/Bq4HCLe3RN0fixXW\u002BscY30Fk2sM4GAf\u002B\u002B\u002BxPdjuVz9f6OoyLO7Mf5qn\u002B\u002B7aq4e/Oxi39TzBw9krTzcAhUMryyaND50suPs\u002BvdOTJtd9vgjxpjILmj8WKu0NHz6TOTyxLrCCeP8zfsT31Xgl1/dN99w/oplDdu45vxlv983pT72Zfz\u002B\u002BFtZgweVb3q7Y\u002BHTofbjDj1H2CUPAzDh8LDN66Lv2BR4yoN/HDXGnNt3oHT\u002BvHM//Rzdpbhra1ze6uCR3xPf09k164a89HzkwGBM6dzZprjvK30//uuk6/XV574\u002BaNszgmPycAsUOu7rXLSkfMv6cHdPOBjsWLA48pK9/9uKyZPOvrUx8hPhcKjt71DnqUveVfemBlftNZUHvwi1\u002B0LH2juffO6SNyl7eF7xXbcVeMrLHpsfPtN1YsY8e54VnGFVV4\u002B6rBu0tkZOeMaYNsvjzEMCklEV9kUveL212lsgYMAIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIuOwCvtzZ6oSrsc\u002BDxAMmITWNsPgeIFQDSCADSCADSkgmAYwDy4wDACgB1qW6BeC8ImZXiBCYZQBJrDeCo5GaSQzCkJR8AR2Hk9PHXzhWAkwDSz5apSykATgLIBqnMYaorABsh5Ojmx/5DMBshpIeNk2ZDAPEJ0gCcFj9jqW/C7VkBaAC5OP12boFoADk3/TafAWgAuTX99v8lmAaQQ9NvjLGqq0cZu7W2tsRfbbM8tv8KiKj6/xs\u002Btv/pyZHPAvV5lLw1hOycfqdWgIstBawGGIgLXzGd\u002B8yBswH02wAZ4GL63Sw4\u002BokbxwNIkEEUJwRxVRf/s24aPmyWpgAumQGQkc9ZpjWAGEpAlny\u002BODMBxCMGcd6M/ntt5gMAMoj/CYY0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoBR9i9M8wQ1SpeJUwAAAABJRU5ErkJggg=="
+          },
+          "primaryMeta": {
+            "title_name": "Sample NX Adventure",
+            "titleName": "Sample NX Adventure",
+            "publisher": "Nintendo",
+            "display_version": "1.1.0",
+            "displayVersion": "1.1.0",
+            "icon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTED8xAAAH3klEQVR4nO3bW2yTZRzH8edduyMH2ToMW0OMjhGNhwhMIHgBKGpQmIiYQExEIaJRMSFRL/DGiGJMVEgELgxyiEYFogsjAxWVwwwiimg0kTgNUZlTRmEDxrbSg6klTR2jjPZ9e/p9P9lFm61dm/y/fZ6n66zq6lEGUFWQ6QcAZBIBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQJo70w/AtLa2ZPohIJO83toM/nYrI/8Qw9AjS2JIawDMPbKthDQFkGD02yxPGh4AslZV2JfBDBwPoN/RZ\u002Bgx8BgczcDZAC6cfkYfSWTgXANOBdBn9Jl7pF6CExk48ncAph\u002B26PO66cSbKPavAPGPkhd\u002B2L4U2LsO2LwCMP1wQvwrqb3rgJ0BMP3IuQZsC4DpRy42YE8ATD9ytAEbAmD6kbsN2HkG4D0fpIeNk5ZqALEEmX6kU2zeUlwEUgqAT3ciG6Qyh/ZsgXj5R/rZMnXJB8DmB3mwEeJ/giEtyQDY/SPbJDeTqa4A7P6RWSlOIFsgSEsmAI6/yJujMCsApBEApBEApF12ABwAkE/HAFYASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASMvPAArH3lTx6YeeXY0VOz9yjfQO27C65IF7o9\u002Bq/GHv0BUvRy8PXbm8ZE69MWZExxFjTMl993h2N3p2N1YFjkUvlMypL3v0ocrvdnn2bKto\u002BsA10hu9YfTnY/pcLVvwoKe5qfL7PcV3Tk3XM0aS3CYfXbHuzZMz5gWP/lVy/8yhr73Y\u002B/neolvG9GzZag0ZbALBwgnjoj9WNGHcmVdWxG7V09DU09AUHWjflEgYxXdMKX1ioe/W6eHunuLp04ZtWO27fVbiX10wvLJ0/lzf5Jnu0TXlDe\u002B0XzfR4eeKlOTnCuC6crhVUhyZ6caPu1at9e87UFg3JjLxE\u002Bt6t\u002B\u002B0ykqt4mJTWGjKSkP/tCe4n0HPPHVq6bJwd48xpnfHZ4HfjkRulVCBp7xr1VoTCgX/bC3wlNv9zGCz/FwBTi1d5mne3rN9Z/e7m/27vjSW5brmKmNZhZPG\u002B5u/Kqge4R5zowkGz31zKPH9uK\u002B/NnDox9jVzkVLLvmrA4dbAodbIhuqOfU92z6x49nAQfkZQPeG93u37iiZdffQlct7G5pOv/Bq4HCLe3RN0fixXW\u002BscY30Fk2sM4GAf\u002B\u002B\u002BxPdjuVz9f6OoyLO7Mf5qn\u002B\u002B7aq4e/Oxi39TzBw9krTzcAhUMryyaND50suPs\u002BvdOTJtd9vgjxpjILmj8WKu0NHz6TOTyxLrCCeP8zfsT31Xgl1/dN99w/oplDdu45vxlv983pT72Zfz\u002B\u002BFtZgweVb3q7Y\u002BHTofbjDj1H2CUPAzDh8LDN66Lv2BR4yoN/HDXGnNt3oHT\u002BvHM//Rzdpbhra1ze6uCR3xPf09k164a89HzkwGBM6dzZprjvK30//uuk6/XV574\u002BaNszgmPycAsUOu7rXLSkfMv6cHdPOBjsWLA48pK9/9uKyZPOvrUx8hPhcKjt71DnqUveVfemBlftNZUHvwi1\u002B0LH2juffO6SNyl7eF7xXbcVeMrLHpsfPtN1YsY8e54VnGFVV4\u002B6rBu0tkZOeMaYNsvjzEMCklEV9kUveL212lsgYMAIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIuOwCvtzZ6oSrsc\u002BDxAMmITWNsPgeIFQDSCADSCADSkgmAYwDy4wDACgB1qW6BeC8ImZXiBCYZQBJrDeCo5GaSQzCkJR8AR2Hk9PHXzhWAkwDSz5apSykATgLIBqnMYaorABsh5Ojmx/5DMBshpIeNk2ZDAPEJ0gCcFj9jqW/C7VkBaAC5OP12boFoADk3/TafAWgAuTX99v8lmAaQQ9NvjLGqq0cZu7W2tsRfbbM8tv8KiKj6/xs\u002Btv/pyZHPAvV5lLw1hOycfqdWgIstBawGGIgLXzGd\u002B8yBswH02wAZ4GL63Sw4\u002BokbxwNIkEEUJwRxVRf/s24aPmyWpgAumQGQkc9ZpjWAGEpAlny\u002BODMBxCMGcd6M/ntt5gMAMoj/CYY0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoBR9i9M8wQ1SpeJUwAAAABJRU5ErkJggg=="
+          },
+          "packages": [
+            {
+              "index": 0,
+              "kind": 0,
+              "kind_name": "base",
+              "kindName": "base",
+              "title_id": "0100123456789ABC",
+              "titleId": "0100123456789ABC",
+              "version": 0,
+              "version_str": "0.0.0",
+              "versionStr": "0.0.0",
+              "display_version": "1.1.0",
+              "displayVersion": "1.1.0",
+              "title_name": "Sample NX Adventure",
+              "titleName": "Sample NX Adventure",
+              "publisher": "Nintendo",
+              "build_id": "ABCDEF1234567890AABBCCDDEEFF001122334455000000000000000000000000",
+              "buildId": "ABCDEF1234567890AABBCCDDEEFF001122334455000000000000000000000000",
+              "source_dump": "sample_dump",
+              "sourceDump": "sample_dump",
+              "has_icon": true,
+              "hasIcon": true,
+              "icon_preview": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTED8xAAAH3klEQVR4nO3bW2yTZRzH8edduyMH2ToMW0OMjhGNhwhMIHgBKGpQmIiYQExEIaJRMSFRL/DGiGJMVEgELgxyiEYFogsjAxWVwwwiimg0kTgNUZlTRmEDxrbSg6klTR2jjPZ9e/p9P9lFm61dm/y/fZ6n66zq6lEGUFWQ6QcAZBIBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQJo70w/AtLa2ZPohIJO83toM/nYrI/8Qw9AjS2JIawDMPbKthDQFkGD02yxPGh4AslZV2JfBDBwPoN/RZ\u002Bgx8BgczcDZAC6cfkYfSWTgXANOBdBn9Jl7pF6CExk48ncAph\u002B26PO66cSbKPavAPGPkhd\u002B2L4U2LsO2LwCMP1wQvwrqb3rgJ0BMP3IuQZsC4DpRy42YE8ATD9ytAEbAmD6kbsN2HkG4D0fpIeNk5ZqALEEmX6kU2zeUlwEUgqAT3ciG6Qyh/ZsgXj5R/rZMnXJB8DmB3mwEeJ/giEtyQDY/SPbJDeTqa4A7P6RWSlOIFsgSEsmAI6/yJujMCsApBEApBEApF12ABwAkE/HAFYASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASMvPAArH3lTx6YeeXY0VOz9yjfQO27C65IF7o9\u002Bq/GHv0BUvRy8PXbm8ZE69MWZExxFjTMl993h2N3p2N1YFjkUvlMypL3v0ocrvdnn2bKto\u002BsA10hu9YfTnY/pcLVvwoKe5qfL7PcV3Tk3XM0aS3CYfXbHuzZMz5gWP/lVy/8yhr73Y\u002B/neolvG9GzZag0ZbALBwgnjoj9WNGHcmVdWxG7V09DU09AUHWjflEgYxXdMKX1ioe/W6eHunuLp04ZtWO27fVbiX10wvLJ0/lzf5Jnu0TXlDe\u002B0XzfR4eeKlOTnCuC6crhVUhyZ6caPu1at9e87UFg3JjLxE\u002Bt6t\u002B\u002B0ykqt4mJTWGjKSkP/tCe4n0HPPHVq6bJwd48xpnfHZ4HfjkRulVCBp7xr1VoTCgX/bC3wlNv9zGCz/FwBTi1d5mne3rN9Z/e7m/27vjSW5brmKmNZhZPG\u002B5u/Kqge4R5zowkGz31zKPH9uK\u002B/NnDox9jVzkVLLvmrA4dbAodbIhuqOfU92z6x49nAQfkZQPeG93u37iiZdffQlct7G5pOv/Bq4HCLe3RN0fixXW\u002BscY30Fk2sM4GAf\u002B\u002B\u002BxPdjuVz9f6OoyLO7Mf5qn\u002B\u002B7aq4e/Oxi39TzBw9krTzcAhUMryyaND50suPs\u002BvdOTJtd9vgjxpjILmj8WKu0NHz6TOTyxLrCCeP8zfsT31Xgl1/dN99w/oplDdu45vxlv983pT72Zfz\u002B\u002BFtZgweVb3q7Y\u002BHTofbjDj1H2CUPAzDh8LDN66Lv2BR4yoN/HDXGnNt3oHT\u002BvHM//Rzdpbhra1ze6uCR3xPf09k164a89HzkwGBM6dzZprjvK30//uuk6/XV574\u002BaNszgmPycAsUOu7rXLSkfMv6cHdPOBjsWLA48pK9/9uKyZPOvrUx8hPhcKjt71DnqUveVfemBlftNZUHvwi1\u002B0LH2juffO6SNyl7eF7xXbcVeMrLHpsfPtN1YsY8e54VnGFVV4\u002B6rBu0tkZOeMaYNsvjzEMCklEV9kUveL212lsgYMAIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIuOwCvtzZ6oSrsc\u002BDxAMmITWNsPgeIFQDSCADSCADSkgmAYwDy4wDACgB1qW6BeC8ImZXiBCYZQBJrDeCo5GaSQzCkJR8AR2Hk9PHXzhWAkwDSz5apSykATgLIBqnMYaorABsh5Ojmx/5DMBshpIeNk2ZDAPEJ0gCcFj9jqW/C7VkBaAC5OP12boFoADk3/TafAWgAuTX99v8lmAaQQ9NvjLGqq0cZu7W2tsRfbbM8tv8KiKj6/xs\u002Btv/pyZHPAvV5lLw1hOycfqdWgIstBawGGIgLXzGd\u002B8yBswH02wAZ4GL63Sw4\u002BokbxwNIkEEUJwRxVRf/s24aPmyWpgAumQGQkc9ZpjWAGEpAlny\u002BODMBxCMGcd6M/ntt5gMAMoj/CYY0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoBR9i9M8wQ1SpeJUwAAAABJRU5ErkJggg==",
+              "iconPreview": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTED8xAAAH3klEQVR4nO3bW2yTZRzH8edduyMH2ToMW0OMjhGNhwhMIHgBKGpQmIiYQExEIaJRMSFRL/DGiGJMVEgELgxyiEYFogsjAxWVwwwiimg0kTgNUZlTRmEDxrbSg6klTR2jjPZ9e/p9P9lFm61dm/y/fZ6n66zq6lEGUFWQ6QcAZBIBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQBoBQJo70w/AtLa2ZPohIJO83toM/nYrI/8Qw9AjS2JIawDMPbKthDQFkGD02yxPGh4AslZV2JfBDBwPoN/RZ\u002Bgx8BgczcDZAC6cfkYfSWTgXANOBdBn9Jl7pF6CExk48ncAph\u002B26PO66cSbKPavAPGPkhd\u002B2L4U2LsO2LwCMP1wQvwrqb3rgJ0BMP3IuQZsC4DpRy42YE8ATD9ytAEbAmD6kbsN2HkG4D0fpIeNk5ZqALEEmX6kU2zeUlwEUgqAT3ciG6Qyh/ZsgXj5R/rZMnXJB8DmB3mwEeJ/giEtyQDY/SPbJDeTqa4A7P6RWSlOIFsgSEsmAI6/yJujMCsApBEApBEApF12ABwAkE/HAFYASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASCMASMvPAArH3lTx6YeeXY0VOz9yjfQO27C65IF7o9\u002Bq/GHv0BUvRy8PXbm8ZE69MWZExxFjTMl993h2N3p2N1YFjkUvlMypL3v0ocrvdnn2bKto\u002BsA10hu9YfTnY/pcLVvwoKe5qfL7PcV3Tk3XM0aS3CYfXbHuzZMz5gWP/lVy/8yhr73Y\u002B/neolvG9GzZag0ZbALBwgnjoj9WNGHcmVdWxG7V09DU09AUHWjflEgYxXdMKX1ioe/W6eHunuLp04ZtWO27fVbiX10wvLJ0/lzf5Jnu0TXlDe\u002B0XzfR4eeKlOTnCuC6crhVUhyZ6caPu1at9e87UFg3JjLxE\u002Bt6t\u002B\u002B0ykqt4mJTWGjKSkP/tCe4n0HPPHVq6bJwd48xpnfHZ4HfjkRulVCBp7xr1VoTCgX/bC3wlNv9zGCz/FwBTi1d5mne3rN9Z/e7m/27vjSW5brmKmNZhZPG\u002B5u/Kqge4R5zowkGz31zKPH9uK\u002B/NnDox9jVzkVLLvmrA4dbAodbIhuqOfU92z6x49nAQfkZQPeG93u37iiZdffQlct7G5pOv/Bq4HCLe3RN0fixXW\u002BscY30Fk2sM4GAf\u002B\u002B\u002BxPdjuVz9f6OoyLO7Mf5qn\u002B\u002B7aq4e/Oxi39TzBw9krTzcAhUMryyaND50suPs\u002BvdOTJtd9vgjxpjILmj8WKu0NHz6TOTyxLrCCeP8zfsT31Xgl1/dN99w/oplDdu45vxlv983pT72Zfz\u002B\u002BFtZgweVb3q7Y\u002BHTofbjDj1H2CUPAzDh8LDN66Lv2BR4yoN/HDXGnNt3oHT\u002BvHM//Rzdpbhra1ze6uCR3xPf09k164a89HzkwGBM6dzZprjvK30//uuk6/XV574\u002BaNszgmPycAsUOu7rXLSkfMv6cHdPOBjsWLA48pK9/9uKyZPOvrUx8hPhcKjt71DnqUveVfemBlftNZUHvwi1\u002B0LH2juffO6SNyl7eF7xXbcVeMrLHpsfPtN1YsY8e54VnGFVV4\u002B6rBu0tkZOeMaYNsvjzEMCklEV9kUveL212lsgYMAIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIIANIuOwCvtzZ6oSrsc\u002BDxAMmITWNsPgeIFQDSCADSCADSkgmAYwDy4wDACgB1qW6BeC8ImZXiBCYZQBJrDeCo5GaSQzCkJR8AR2Hk9PHXzhWAkwDSz5apSykATgLIBqnMYaorABsh5Ojmx/5DMBshpIeNk2ZDAPEJ0gCcFj9jqW/C7VkBaAC5OP12boFoADk3/TafAWgAuTX99v8lmAaQQ9NvjLGqq0cZu7W2tsRfbbM8tv8KiKj6/xs\u002Btv/pyZHPAvV5lLw1hOycfqdWgIstBawGGIgLXzGd\u002B8yBswH02wAZ4GL63Sw4\u002BokbxwNIkEEUJwRxVRf/s24aPmyWpgAumQGQkc9ZpjWAGEpAlny\u002BODMBxCMGcd6M/ntt5gMAMoj/CYY0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoA0AoBR9i9M8wQ1SpeJUwAAAABJRU5ErkJggg==",
+              "has_exefs": true,
+              "hasExeFs": true,
+              "has_romfs": true,
+              "hasRomFs": true,
+              "root_dir_index": 0,
+              "rootDirIndex": 0,
+              "exefs_dir_index": 1,
+              "exeFsDirIndex": 1,
+              "romfs_dir_index": 2,
+              "romFsDirIndex": 2,
+              "file_count": 4,
+              "fileCount": 4,
+              "uncompressed_bytes": 23236,
+              "uncompressedBytes": 23236,
+              "uncompressed_formatted": "22.69 KB",
+              "uncompressedFormatted": "22.69 KB",
+              "compressed_bytes": 203,
+              "compressedBytes": 203,
+              "compressed_formatted": "203 B",
+              "compressedFormatted": "203 B"
+            },
+            {
+              "index": 1,
+              "kind": 1,
+              "kind_name": "update",
+              "kindName": "update",
+              "title_id": "0100123456789ABC",
+              "titleId": "0100123456789ABC",
+              "version": 65536,
+              "version_str": "1.0.0",
+              "versionStr": "1.0.0",
+              "display_version": "1.0.0",
+              "displayVersion": "1.0.0",
+              "title_name": "Title 0100123456789ABC",
+              "titleName": "Title 0100123456789ABC",
+              "publisher": "Unknown Publisher",
+              "build_id": "",
+              "buildId": "",
+              "source_dump": "sample_dump",
+              "sourceDump": "sample_dump",
+              "has_icon": false,
+              "hasIcon": false,
+              "icon_preview": "",
+              "iconPreview": "",
+              "has_exefs": false,
+              "hasExeFs": false,
+              "has_romfs": true,
+              "hasRomFs": true,
+              "root_dir_index": 6,
+              "rootDirIndex": 6,
+              "exefs_dir_index": 4294967295,
+              "exeFsDirIndex": 4294967295,
+              "romfs_dir_index": 7,
+              "romFsDirIndex": 7,
+              "file_count": 1,
+              "fileCount": 1,
+              "uncompressed_bytes": 77,
+              "uncompressedBytes": 77,
+              "uncompressed_formatted": "77 B",
+              "uncompressedFormatted": "77 B",
+              "compressed_bytes": 77,
+              "compressedBytes": 77,
+              "compressed_formatted": "77 B",
+              "compressedFormatted": "77 B"
+            }
+          ],
+          "stats": {
+            "total_dirs": 9,
+            "totalDirs": 9,
+            "total_files": 5,
+            "totalFiles": 5,
+            "total_uncompressed_bytes": 23313,
+            "totalUncompressedBytes": 23313,
+            "total_uncompressed_formatted": "22.77 KB",
+            "totalUncompressedFormatted": "22.77 KB",
+            "compression_ratio": 84.7,
+            "compressionRatio": 84.7
+          }
+        }
+      }
+    },
+    {
+      "name": "get_tree",
+      "request": {
+        "id": "req_3",
+        "action": "get_tree",
+        "filePath": "\u003CREPO\u003E/sample_game.nup",
+        "dirIndex": 0
+      },
+      "response": {
+        "id": "req_3",
+        "action": "get_tree_result",
+        "success": true,
+        "data": {
+          "type": "dir",
+          "index": 0,
+          "name": "root",
+          "children": [
+            {
+              "type": "dir",
+              "index": 1,
+              "name": "exefs",
+              "child_count": 1,
+              "childCount": 1,
+              "has_children": true,
+              "hasChildren": true
+            },
+            {
+              "type": "dir",
+              "index": 2,
+              "name": "romfs",
+              "child_count": 2,
+              "childCount": 2,
+              "has_children": true,
+              "hasChildren": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "search",
+      "request": {
+        "id": "req_4",
+        "action": "search",
+        "filePath": "\u003CREPO\u003E/sample_game.nup",
+        "query": "level"
+      },
+      "response": {
+        "id": "req_4",
+        "action": "search_result",
+        "success": true,
+        "query": "level",
+        "results": [
+          {
+            "index": 2,
+            "name": "level01.dat",
+            "size": 8000,
+            "size_formatted": "7.81 KB",
+            "sizeFormatted": "7.81 KB",
+            "extent_size": 34,
+            "extentSize": 34,
+            "extent_size_formatted": "34 B",
+            "extentSizeFormatted": "34 B",
+            "codec": "zstd",
+            "sha256": "fb6f42a3929517c310d3ea0160c674030021d43990fa14af64663e7d3141bb67"
+          }
+        ]
+      }
+    },
+    {
+      "name": "verify_done",
+      "request": {
+        "action": "verify",
+        "filePath": "\u003CREPO\u003E/sample_game.nup",
+        "deep": true
+      },
+      "response": {
+        "type": "verify_done",
+        "info": {
+          "status": "done",
+          "current": 5,
+          "total": 5,
+          "percent": 100,
+          "fileName": "",
+          "valid": true,
+          "problems": [],
+          "totalFilesChecked": 5,
+          "error": null
+        }
+      }
+    },
+    {
+      "name": "get_orb_settings",
+      "request": {
+        "id": "req_5",
+        "action": "get_orb_settings"
+      },
+      "response": {
+        "id": "req_5",
+        "action": "orb_settings_result",
+        "success": true,
+        "settings": {
+          "launchMode": "Expanded",
+          "theme": "dark",
+          "orbEdge": "Right",
+          "state": "expanded"
+        },
+        "appearance": {
+          "reducedMotion": false,
+          "highContrast": false,
+          "transparencyEnabled": true
+        }
+      }
+    },
+    {
+      "name": "morph_frame_event",
+      "request": {
+        "action": "orb_expand"
+      },
+      "response": {
+        "type": "morph_frame",
+        "state": "expanded",
+        "progress": 1,
+        "radiusPx": 28,
+        "shellX": 0,
+        "shellY": 0,
+        "orbRelX": 0,
+        "orbRelY": 0,
+        "width": 1240,
+        "height": 820,
+        "expandedWidth": 1240,
+        "expandedHeight": 820,
+        "reducedMotion": false,
+        "edge": "right"
+      }
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+{
+  "fixture": "edge_cases",
+  "modes": [
+    {
+      "label": "all",
+      "mode": "all",
+      "packageIndex": null,
+      "subtreePath": null,
+      "fileCount": 4,
+      "firstStatus": {
+        "status": "starting",
+        "current": 0,
+        "total": 4,
+        "percent": 0,
+        "fileName": "Initializing extraction...",
+        "bytesWritten": 0,
+        "totalBytes": 423
+      },
+      "lastStatus": {
+        "status": "completed",
+        "current": 4,
+        "total": 4,
+        "percent": 100,
+        "fileName": "Done",
+        "bytesWritten": 423,
+        "totalBytes": 423
+      },
+      "files": [
+        {
+          "relPath": "romfs/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_long_name_test.bin",
+          "size": 360,
+          "sha256": "be784fc87d39ce58d76553a10d553f3688de4eb43466d9ffa4f69118d26d15b2"
+        },
+        {
+          "relPath": "romfs/empty_zero_bytes.dat",
+          "size": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "relPath": "romfs/lvl01/lvl02/lvl03/lvl04/lvl05/lvl06/lvl07/lvl08/lvl09/lvl10/deep_leaf.txt",
+          "size": 17,
+          "sha256": "b78d8ad1224d10a38ff5a883c059ef137d1072c7bf0dffbb9617c8adcd7128a0"
+        },
+        {
+          "relPath": "romfs/\u65E5\u672C\u8A9E_caf\u00E9.txt",
+          "size": 46,
+          "sha256": "10a8b1d95550734215f504a72c9bcdfa8b16a45e3cb9a564e0bcba86a3c9790c"
+        }
+      ]
+    },
+    {
+      "label": "package_0",
+      "mode": "package",
+      "packageIndex": 0,
+      "subtreePath": null,
+      "fileCount": 4,
+      "firstStatus": {
+        "status": "starting",
+        "current": 0,
+        "total": 4,
+        "percent": 0,
+        "fileName": "Initializing extraction...",
+        "bytesWritten": 0,
+        "totalBytes": 423
+      },
+      "lastStatus": {
+        "status": "completed",
+        "current": 4,
+        "total": 4,
+        "percent": 100,
+        "fileName": "Done",
+        "bytesWritten": 423,
+        "totalBytes": 423
+      },
+      "files": [
+        {
+          "relPath": "romfs/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_long_name_test.bin",
+          "size": 360,
+          "sha256": "be784fc87d39ce58d76553a10d553f3688de4eb43466d9ffa4f69118d26d15b2"
+        },
+        {
+          "relPath": "romfs/empty_zero_bytes.dat",
+          "size": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "relPath": "romfs/lvl01/lvl02/lvl03/lvl04/lvl05/lvl06/lvl07/lvl08/lvl09/lvl10/deep_leaf.txt",
+          "size": 17,
+          "sha256": "b78d8ad1224d10a38ff5a883c059ef137d1072c7bf0dffbb9617c8adcd7128a0"
+        },
+        {
+          "relPath": "romfs/\u65E5\u672C\u8A9E_caf\u00E9.txt",
+          "size": 46,
+          "sha256": "10a8b1d95550734215f504a72c9bcdfa8b16a45e3cb9a564e0bcba86a3c9790c"
+        }
+      ]
+    },
+    {
+      "label": "subtree_pkg0_romfs",
+      "mode": "subtree",
+      "packageIndex": 0,
+      "subtreePath": "romfs",
+      "fileCount": 4,
+      "firstStatus": {
+        "status": "starting",
+        "current": 0,
+        "total": 4,
+        "percent": 0,
+        "fileName": "Initializing extraction...",
+        "bytesWritten": 0,
+        "totalBytes": 423
+      },
+      "lastStatus": {
+        "status": "completed",
+        "current": 4,
+        "total": 4,
+        "percent": 100,
+        "fileName": "Done",
+        "bytesWritten": 423,
+        "totalBytes": 423
+      },
+      "files": [
+        {
+          "relPath": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_long_name_test.bin",
+          "size": 360,
+          "sha256": "be784fc87d39ce58d76553a10d553f3688de4eb43466d9ffa4f69118d26d15b2"
+        },
+        {
+          "relPath": "empty_zero_bytes.dat",
+          "size": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "relPath": "lvl01/lvl02/lvl03/lvl04/lvl05/lvl06/lvl07/lvl08/lvl09/lvl10/deep_leaf.txt",
+          "size": 17,
+          "sha256": "b78d8ad1224d10a38ff5a883c059ef137d1072c7bf0dffbb9617c8adcd7128a0"
+        },
+        {
+          "relPath": "\u65E5\u672C\u8A9E_caf\u00E9.txt",
+          "size": 46,
+          "sha256": "10a8b1d95550734215f504a72c9bcdfa8b16a45e3cb9a564e0bcba86a3c9790c"
+        }
+      ]
+    }
+  ]
+}

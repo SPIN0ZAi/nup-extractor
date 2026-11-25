@@ -7,7 +7,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <ApplicationIcon>..\app_icon.ico</ApplicationIcon>
+    <ApplicationIcon>..\..\app_icon.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -29,8 +30,11 @@
 
   <!-- Embed static UI assets into assembly -->
   <ItemGroup>
-    <EmbeddedResource Include="..\static\**\*">
+    <EmbeddedResource Include="..\..\static\**\*">
       <Link>static\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\..\app_icon.ico">
+      <Link>static\app_icon.ico</Link>
     </EmbeddedResource>
   </ItemGroup>
 

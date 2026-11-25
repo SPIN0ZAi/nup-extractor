@@ -1,0 +1,242 @@
+{
+  "fixture": "sample_game",
+  "modes": [
+    {
+      "label": "all",
+      "mode": "all",
+      "packageIndex": null,
+      "subtreePath": null,
+      "fileCount": 5,
+      "firstStatus": {
+        "status": "starting",
+        "current": 0,
+        "total": 5,
+        "percent": 0,
+        "fileName": "Initializing extraction...",
+        "bytesWritten": 0,
+        "totalBytes": 23313
+      },
+      "lastStatus": {
+        "status": "completed",
+        "current": 5,
+        "total": 5,
+        "percent": 100,
+        "fileName": "Done",
+        "bytesWritten": 23313,
+        "totalBytes": 23313
+      },
+      "files": [
+        {
+          "relPath": "base/exefs/main",
+          "size": 2144,
+          "sha256": "542ed0545aa69e38fe758245ed83161aa1a8b850101e8bf85b81613dea3eb385"
+        },
+        {
+          "relPath": "base/romfs/data/config.json",
+          "size": 92,
+          "sha256": "1fe07b7c026d2b2d889b7dd7e7e762146c84bbf8248ddd6b1f513300170a2d8c"
+        },
+        {
+          "relPath": "base/romfs/data/levels/level01.dat",
+          "size": 8000,
+          "sha256": "fb6f42a3929517c310d3ea0160c674030021d43990fa14af64663e7d3141bb67"
+        },
+        {
+          "relPath": "base/romfs/textures/ui_sheet.bin",
+          "size": 13000,
+          "sha256": "9040964ebac98dac9dcd642fb1c7877494eea201092b81773ee04af14b48cf61"
+        },
+        {
+          "relPath": "updates/65536/romfs/data/patch_notes.txt",
+          "size": 77,
+          "sha256": "4fea34bbcde01b98dd42cb00611e8c51b356ab361d14539a209a0415a6ebbcd4"
+        }
+      ]
+    },
+    {
+      "label": "package_0",
+      "mode": "package",
+      "packageIndex": 0,
+      "subtreePath": null,
+      "fileCount": 4,
+      "firstStatus": {
+        "status": "starting",
+        "current": 0,
+        "total": 4,
+        "percent": 0,
+        "fileName": "Initializing extraction...",
+        "bytesWritten": 0,
+        "totalBytes": 23236
+      },
+      "lastStatus": {
+        "status": "completed",
+        "current": 4,
+        "total": 4,
+        "percent": 100,
+        "fileName": "Done",
+        "bytesWritten": 23236,
+        "totalBytes": 23236
+      },
+      "files": [
+        {
+          "relPath": "exefs/main",
+          "size": 2144,
+          "sha256": "542ed0545aa69e38fe758245ed83161aa1a8b850101e8bf85b81613dea3eb385"
+        },
+        {
+          "relPath": "romfs/data/config.json",
+          "size": 92,
+          "sha256": "1fe07b7c026d2b2d889b7dd7e7e762146c84bbf8248ddd6b1f513300170a2d8c"
+        },
+        {
+          "relPath": "romfs/data/levels/level01.dat",
+          "size": 8000,
+          "sha256": "fb6f42a3929517c310d3ea0160c674030021d43990fa14af64663e7d3141bb67"
+        },
+        {
+          "relPath": "romfs/textures/ui_sheet.bin",
+          "size": 13000,
+          "sha256": "9040964ebac98dac9dcd642fb1c7877494eea201092b81773ee04af14b48cf61"
+        }
+      ]
+    },
+    {
+      "label": "subtree_pkg0_romfs",
+      "mode": "subtree",
+      "packageIndex": 0,
+      "subtreePath": "romfs",
+      "fileCount": 3,
+      "firstStatus": {
+        "status": "starting",
+        "current": 0,
+        "total": 3,
+        "percent": 0,
+        "fileName": "Initializing extraction...",
+        "bytesWritten": 0,
+        "totalBytes": 21092
+      },
+      "lastStatus": {
+        "status": "completed",
+        "current": 3,
+        "total": 3,
+        "percent": 100,
+        "fileName": "Done",
+        "bytesWritten": 21092,
+        "totalBytes": 21092
+      },
+      "files": [
+        {
+          "relPath": "data/config.json",
+          "size": 92,
+          "sha256": "1fe07b7c026d2b2d889b7dd7e7e762146c84bbf8248ddd6b1f513300170a2d8c"
+        },
+        {
+          "relPath": "data/levels/level01.dat",
+          "size": 8000,
+          "sha256": "fb6f42a3929517c310d3ea0160c674030021d43990fa14af64663e7d3141bb67"
+        },
+        {
+          "relPath": "textures/ui_sheet.bin",
+          "size": 13000,
+          "sha256": "9040964ebac98dac9dcd642fb1c7877494eea201092b81773ee04af14b48cf61"
+        }
+      ]
+    },
+    {
+      "label": "subtree_pkg0_exefs",
+      "mode": "subtree",
+      "packageIndex": 0,
+      "subtreePath": "exefs",
+      "fileCount": 1,
+      "firstStatus": {
+        "status": "starting",
+        "current": 0,
+        "total": 1,
+        "percent": 0,
+        "fileName": "Initializing extraction...",
+        "bytesWritten": 0,
+        "totalBytes": 2144
+      },
+      "lastStatus": {
+        "status": "completed",
+        "current": 1,
+        "total": 1,
+        "percent": 100,
+        "fileName": "Done",
+        "bytesWritten": 2144,
+        "totalBytes": 2144
+      },
+      "files": [
+        {
+          "relPath": "main",
+          "size": 2144,
+          "sha256": "542ed0545aa69e38fe758245ed83161aa1a8b850101e8bf85b81613dea3eb385"
+        }
+      ]
+    },
+    {
+      "label": "package_1",
+      "mode": "package",
+      "packageIndex": 1,
+      "subtreePath": null,
+      "fileCount": 1,
+      "firstStatus": {
+        "status": "starting",
+        "current": 0,
+        "total": 1,
+        "percent": 0,
+        "fileName": "Initializing extraction...",
+        "bytesWritten": 0,
+        "totalBytes": 77
+      },
+      "lastStatus": {
+        "status": "completed",
+        "current": 1,
+        "total": 1,
+        "percent": 100,
+        "fileName": "Done",
+        "bytesWritten": 77,
+        "totalBytes": 77
+      },
+      "files": [
+        {
+          "relPath": "romfs/data/patch_notes.txt",
+          "size": 77,
+          "sha256": "4fea34bbcde01b98dd42cb00611e8c51b356ab361d14539a209a0415a6ebbcd4"
+        }
+      ]
+    },
+    {
+      "label": "subtree_pkg1_romfs",
+      "mode": "subtree",
+      "packageIndex": 1,
+      "subtreePath": "romfs",
+      "fileCount": 1,
+      "firstStatus": {
+        "status": "starting",
+        "current": 0,
+        "total": 1,
+        "percent": 0,
+        "fileName": "Initializing extraction...",
+        "bytesWritten": 0,
+        "totalBytes": 77
+      },
+      "lastStatus": {
+        "status": "completed",
+        "current": 1,
+        "total": 1,
+        "percent": 100,
+        "fileName": "Done",
+        "bytesWritten": 77,
+        "totalBytes": 77
+      },
+      "files": [
+        {
+          "relPath": "data/patch_notes.txt",
+          "size": 77,
+          "sha256": "4fea34bbcde01b98dd42cb00611e8c51b356ab361d14539a209a0415a6ebbcd4"
+        }
+      ]
+    }
+  ]
+}

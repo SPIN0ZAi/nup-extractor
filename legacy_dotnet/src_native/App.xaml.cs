@@ -9,11 +9,20 @@ namespace NupExtractorApp;
 public partial class App : Application
 {
     public static string? InitialFilePath { get; set; }
+    public static string? StartupModeOverride { get; set; }
 
     protected override void OnStartup(StartupEventArgs e)
     {
         if (e.Args.Length > 0)
         {
+            foreach (var arg in e.Args)
+            {
+                if (arg.StartsWith("--start-mode=", StringComparison.OrdinalIgnoreCase))
+                {
+                    StartupModeOverride = arg["--start-mode=".Length..].Trim();
+                }
+            }
+
             string first = e.Args[0];
 
             if (first == "--update-replace" && e.Args.Length >= 3)

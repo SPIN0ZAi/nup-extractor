@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NUP Extractor | High-Performance NX Package Tool for Windows</title>
-    <meta name="description" content="Ultra-fast, native Windows GUI extractor for Nintendo Switch .nup container archives. Zero-copy memory mapping, hardware-accelerated Zstandard decompression, and modern Joy-Con dark UI.">
+    <title>NUP Extractor | Inspect, Extract &amp; Pack NX Packages for Windows</title>
+    <meta name="description" content="Fast, lightweight Windows desktop app to inspect, verify, pack, and extract Nintendo Switch .nup containers with drag-and-drop batch extraction and Liquid Glass UI.">
     
     <!-- Open Graph / Meta -->
-    <meta property="og:title" content="NUP Extractor - High-Performance Nintendo Switch Archive Tool">
-    <meta property="og:description" content="Native Windows desktop app to inspect, decompress, and extract .nup archives with SIMD Zstd and zero-copy memory mapping.">
-    <meta property="og:image" content="pictures/main-UI.png">
+    <meta property="og:title" content="NUP Extractor — Nintendo Switch NX Package Utility">
+    <meta property="og:description" content="Portable Windows utility to inspect, verify, extract, and pack .nup game containers (Base, Updates, &amp; DLCs) with Liquid Glass UI and Floating Orb mode.">
+    <meta property="og:image" content="pictures/liquid-glass-expanded.png">
     <meta property="og:type" content="website">
 
     <!-- Favicon -->
@@ -37,7 +37,7 @@
         <ul class="nav-links">
             <li><a href="#features" class="nav-link">Features</a></li>
             <li><a href="#showcase" class="nav-link">UI Showcase</a></li>
-            <li><a href="#architecture" class="nav-link">Architecture</a></li>
+            <li><a href="#usage" class="nav-link">How It Works</a></li>
             <li><a href="#download" class="nav-link">Download</a></li>
             <li>
                 <a href="https://github.com/SPIN0ZAi/nup-extractor" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
@@ -53,14 +53,14 @@
     <!-- Hero Section -->
     <header class="hero">
         <div class="badge-pill">
-            <span class="badge-dot"></span> Production-Ready &bull; Built with Native .NET 10 &amp; WebView2
+            <span class="badge-dot"></span> Native Windows &bull; Liquid Glass &amp; WebView2
         </div>
         <h1>
-            Ultra-Fast <span class="gradient-text">Nintendo Switch</span><br>
-            Package Extractor
+            Fast &amp; Effortless <span class="gradient-text">Nintendo Switch</span><br>
+            NX Package Manager
         </h1>
         <p>
-            An open-source, high-performance desktop application engineered to inspect, decompress, and extract <code>.nup</code> (NX Package) archives with zero-copy memory mapping, hardware-accelerated Zstandard decompression, and a Joy-Con dark UI.
+            A portable Windows desktop utility to inspect, verify, pack, and extract <code>.nup</code> game archives (Base, Updates, &amp; DLCs) with drag-and-drop batch extraction, live ETA telemetry, and an optional Floating Desktop Orb.
         </p>
 
         <div class="hero-cta">
@@ -70,7 +70,7 @@
                     <polyline points="7 10 12 15 17 10"></polyline>
                     <line x1="12" y1="15" x2="12" y2="3"></line>
                 </svg>
-                Download v1.0.0 for Windows
+                Download Latest for Windows
             </a>
             <a href="https://github.com/SPIN0ZAi/nup-extractor" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -84,33 +84,34 @@
                     <line x1="8" y1="21" x2="16" y2="21"></line>
                     <line x1="12" y1="17" x2="12" y2="21"></line>
                 </svg>
-                Explore Screenshots
+                Explore Showcase
             </a>
         </div>
 
         <div class="hero-image-wrapper">
-            <img src="pictures/main-UI.png" alt="NUP Extractor Interface" class="hero-image">
+            <img src="pictures/liquid-glass-expanded.png" alt="NUP Extractor Liquid Glass Interface" class="hero-image">
         </div>
     </header>
 
     <!-- Key Features Section -->
     <section class="section" id="features">
         <div class="section-header">
-            <div class="section-tag">Performance &amp; Reliability</div>
-            <h2 class="section-title">Engineered for Massive Game Archives</h2>
-            <p class="section-desc">Designed from the ground up to replace clunky CLI scripts and sluggish interpreters with a rock-solid, production-grade native application.</p>
+            <div class="section-tag">Built for Players &amp; Modders</div>
+            <h2 class="section-title">Everything You Need for .NUP Archives</h2>
+            <p class="section-desc">Inspect contents, verify file integrity, pack multi-package game folders, and batch-extract archives effortlessly—all in one tiny portable app.</p>
         </div>
 
         <div class="features-grid">
             <div class="feature-card">
                 <div class="feature-icon-box">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                        <path d="M12 3v12m0 0l-4-4m4 4l4-4"></path>
+                        <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path>
                     </svg>
                 </div>
-                <h3 class="feature-title">64-bit Zero-Copy Memory Mapping</h3>
+                <h3 class="feature-title">Drag-and-Drop Batch Extraction</h3>
                 <p class="feature-text">
-                    Employs OS kernel-level <code>MemoryMappedFile</code> for instantaneous index parsing and random-access chunk reads without loading multi-gigabyte files into RAM.
+                    Drop one or multiple <code>.nup</code> files straight onto <code>NUP_Extractor.exe</code> or anywhere in the window to extract Base games, Updates, and DLCs automatically.
                 </p>
             </div>
 
@@ -122,22 +123,22 @@
                         <line x1="12" y1="22.08" x2="12" y2="12"></line>
                     </svg>
                 </div>
-                <h3 class="feature-title">Hardware-Accelerated Zstandard</h3>
+                <h3 class="feature-title">Built-In Multi-Package Packer</h3>
                 <p class="feature-text">
-                    Direct C# binding via <code>ZstdSharp.Port</code> with SIMD acceleration for multi-gigabyte-per-second decompression throughput on RAW and ZSTD chunks.
+                    Package extracted Switch 1 &amp; Switch 2 directories—including Base, Updates, and DLCs—back into compact Zstandard or RAW <code>.nup</code> files with live packing metrics.
                 </p>
             </div>
 
             <div class="feature-card">
                 <div class="feature-icon-box green">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                        <polyline points="9 12 11 14 15 10"></polyline>
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <circle cx="12" cy="12" r="3"></circle>
                     </svg>
                 </div>
-                <h3 class="feature-title">True Standalone Executable</h3>
+                <h3 class="feature-title">Liquid Glass &amp; Floating Orb</h3>
                 <p class="feature-text">
-                    Pure Windows GUI application (<code>WinExe</code>) with zero black command prompt windows, zero Python dependency, and no freezing or antivirus sandboxing latency.
+                    Enjoy translucent Windows Acrylic styling in Dark or Light themes, plus an optional <strong>Minimize to Orb</strong> mode that tracks active jobs cleanly on your screen edge.
                 </p>
             </div>
 
@@ -152,9 +153,9 @@
                         <line x1="3" y1="18" x2="3.01" y2="18"></line>
                     </svg>
                 </div>
-                <h3 class="feature-title">Selective &amp; Subtree Extraction</h3>
+                <h3 class="feature-title">Selective &amp; Single-File Extraction</h3>
                 <p class="feature-text">
-                    Extract the full archive or cherry-pick specific game packages (RomFS, ExeFS, DLC, Updates) and individual directories via the interactive visual tree.
+                    Browse Base, Update, and DLC tabs, search thousands of paths instantly, extract full archives or just <code>romfs/</code> / <code>exefs/</code>, or right-click any single file.
                 </p>
             </div>
 
@@ -165,21 +166,22 @@
                         <polyline points="12 6 12 12 16 14"></polyline>
                     </svg>
                 </div>
-                <h3 class="feature-title">Real-Time Extraction Telemetry</h3>
+                <h3 class="feature-title">Live ETA, Speed &amp; Completion Time</h3>
                 <p class="feature-text">
-                    Throttled UI progress dispatching eliminates UI lag, displaying live MB/s transfer speed, elapsed time, ETA countdown, and item counts.
+                    Smooth, lag-free progress modals show real-time MB/s speed, estimated time remaining, total time spent, disk space pre-checks, and instant cancel or minimize controls.
                 </p>
             </div>
 
             <div class="feature-card">
                 <div class="feature-icon-box green">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="20 6 9 17 4 12"></polyline>
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        <polyline points="9 12 11 14 15 10"></polyline>
                     </svg>
                 </div>
-                <h3 class="feature-title">19 Automated Unit Tests</h3>
+                <h3 class="feature-title">Integrity Verification &amp; Shell Menu</h3>
                 <p class="feature-text">
-                    19 automated xUnit unit tests verifying Superblock parsing, bad magic rejection, streaming decompression, directory traversal guards, and integrity checks.
+                    Verify Superblock, TOC, and per-file SHA-256 checksums in one click, and optionally integrate <code>.nup</code> right-click &amp; double-click actions into Windows Explorer.
                 </p>
             </div>
 
@@ -189,9 +191,9 @@
                         <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
                     </svg>
                 </div>
-                <h3 class="feature-title">Built-In In-Place Auto-Updater</h3>
+                <h3 class="feature-title">Verified In-Place Auto-Updater</h3>
                 <p class="feature-text">
-                    Automatically checks GitHub Releases, notifies with Update / Remind Me Later / Skip controls, downloads and replaces executable seamlessly in-place.
+                    Checks GitHub Releases automatically, shows clear release highlights with Update / Later / Skip controls, verifies SHA-256 hashes, and upgrades in place without losing settings.
                 </p>
             </div>
         </div>
@@ -201,56 +203,72 @@
     <section class="section" id="showcase">
         <div class="section-header">
             <div class="section-tag">Visual Walkthrough</div>
-            <h2 class="section-title">Designed with Gamer &amp; Modder Focus</h2>
-            <p class="section-desc">Experience a sleek Joy-Con neon red and cyan aesthetic with clean glassmorphic panels and intuitive file navigation.</p>
+            <h2 class="section-title">Designed for Speed &amp; Clarity</h2>
+            <p class="section-desc">Liquid Glass translucency meets Switch-inspired red and cyan highlights across every workflow.</p>
         </div>
 
         <div class="gallery-grid">
             <div class="gallery-card">
-                <img src="pictures/extractor-main-UI.png" alt="Container Inspection and Table of Contents">
+                <img src="pictures/liquid-glass-expanded.png" alt="Liquid Glass Workspace and Container Inspector">
                 <div class="gallery-info">
-                    <div class="gallery-title">Interactive Container Inspector</div>
-                    <div class="gallery-desc">Inspect game Title IDs, package lists, file hierarchy trees, and search file paths in real time.</div>
+                    <div class="gallery-title">Liquid Glass Workspace</div>
+                    <div class="gallery-desc">Drop a <code>.nup</code> file or click anywhere to browse—view game artwork, Title/Build IDs, compression stats, and Base/Update/DLC tabs.</div>
                 </div>
             </div>
 
             <div class="gallery-card">
-                <img src="pictures/extractor-progress-UI.png" alt="Extraction Progress Modal">
+                <img src="pictures/liquid-glass-extract-modal.png" alt="Extraction Progress Modal with ETA and Logs">
                 <div class="gallery-info">
-                    <div class="gallery-title">Real-Time Progress &amp; Logging</div>
-                    <div class="gallery-desc">Monitor live extraction progress percentage, streaming speed in MB/s, and detailed chronological logs.</div>
+                    <div class="gallery-title">Live Progress, ETA &amp; Logs</div>
+                    <div class="gallery-desc">Monitor remaining time estimates, byte throughput, and clean file logs—plus Minimize to Orb or Cancel whenever needed.</div>
+                </div>
+            </div>
+
+            <div class="gallery-card">
+                <img src="pictures/orb-morph-demo.gif" alt="Floating Desktop Orb Morph Animation">
+                <div class="gallery-info">
+                    <div class="gallery-title">Floating Desktop Orb Mode</div>
+                    <div class="gallery-desc">Collapse the window into a compact edge-snapped orb that keeps running tasks visible with a circular progress ring.</div>
+                </div>
+            </div>
+
+            <div class="gallery-card">
+                <img src="pictures/extractor-main-UI.png" alt="Interactive File Tree and Verification Workspace">
+                <div class="gallery-info">
+                    <div class="gallery-title">Interactive Tree &amp; Search</div>
+                    <div class="gallery-desc">Navigate thousands of files instantly with codec badges, fast search, SHA-256 copy shortcuts, and selective subtree extraction.</div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Architecture & Specification -->
-    <section class="section" id="architecture">
+    <!-- Quick Usage Guide Section -->
+    <section class="section" id="usage">
         <div class="section-header">
-            <div class="section-tag">Under The Hood</div>
-            <h2 class="section-title">Specification v1 Compliance</h2>
-            <p class="section-desc">Full compliance with the official NX Package Specification (SPEC v1).</p>
+            <div class="section-tag">Simple Workflow</div>
+            <h2 class="section-title">How It Works</h2>
+            <p class="section-desc">Zero installation or external runtimes required—ready in seconds from a single ~5.5 MB executable.</p>
         </div>
 
         <div class="features-grid">
             <div class="feature-card">
-                <h3 class="feature-title" style="color: var(--switch-blue);">Superblock Layout</h3>
+                <h3 class="feature-title" style="color: var(--switch-blue);">1. Drag &amp; Drop to Extract</h3>
                 <p class="feature-text">
-                    Validates 64-byte binary header with <code>NUP\x01</code> magic, version 1, TOC offset, TOC size, TOC entry count, and archive-level metadata JSON chunk.
+                    Drag one or multiple <code>.nup</code> files directly onto <code>NUP_Extractor.exe</code> (or onto the app window) to automatically extract Base games, Updates, and DLCs next to each archive.
                 </p>
             </div>
 
             <div class="feature-card">
-                <h3 class="feature-title" style="color: var(--switch-red);">Table of Contents (TOC)</h3>
+                <h3 class="feature-title" style="color: var(--switch-red);">2. Inspect &amp; Verify First</h3>
                 <p class="feature-text">
-                    Binary entry records containing path offset, chunk offset, stored size, original size, and compression flag (<code>0x00=RAW</code>, <code>0x01=ZSTD</code>).
+                    Launch the app, click anywhere on the dropzone, or double-click a registered <code>.nup</code> file to explore Title/Build IDs, search files, verify SHA-256 hashes, or extract specific folders.
                 </p>
             </div>
 
             <div class="feature-card">
-                <h3 class="feature-title" style="color: var(--switch-green);">Zero Console Shell</h3>
+                <h3 class="feature-title" style="color: var(--switch-green);">3. Pack Game Folders</h3>
                 <p class="feature-text">
-                    Pure Win32 Subsystem execution via Microsoft Edge WebView2 direct asynchronous IPC, eliminating Console QuickEdit pausing and lag.
+                    Switch to <strong>Pack</strong> mode, drop or select a folder containing your game files (Base, Updates, &amp; DLCs), pick Fast, Ultra, or RAW compression, and build a verified <code>.nup</code> archive.
                 </p>
             </div>
         </div>
@@ -260,11 +278,11 @@
     <section class="section" id="download">
         <div class="download-card">
             <div class="badge-pill" style="margin-bottom: 1rem;">
-                <span class="badge-dot"></span> Official Windows Release
+                <span class="badge-dot"></span> Official Windows x64 Release
             </div>
             <h2 class="download-title">Download NUP Extractor</h2>
             <p class="download-desc">
-                Standalone 64-bit Windows executable. Zero installation required, zero external dependencies. Extract anywhere and launch immediately.
+                Standalone ~5.5 MB Windows executable. Zero installation, zero external SDKs required. Includes built-in SHA-256 verified auto-updates.
             </p>
 
             <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
@@ -286,9 +304,9 @@
             </div>
 
             <div style="margin-top: 2rem;">
-                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Verify Integrity via PowerShell:</div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Verify Integrity via PowerShell (match against <code>SHA256SUMS.txt</code>):</div>
                 <div class="checksum-box">
-                    Get-FileHash .\NUP_Extractor-windows-x64.zip -Algorithm SHA256
+                    Get-FileHash .\NUP_Extractor.exe -Algorithm SHA256
                 </div>
             </div>
         </div>
@@ -306,4 +324,3 @@
 
 </body>
 </html>
-

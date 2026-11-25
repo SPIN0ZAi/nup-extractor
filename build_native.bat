@@ -1,30 +1,32 @@
 @echo off
-title Build Native NUP Extractor
-echo ========================================================
-echo   RUNNING AUTOMATED TEST SUITE (TDD / CI)
-echo ========================================================
-dotnet test tests_native -c Release
-if %ERRORLEVEL% neq 0 (
-    echo.
-    echo [!] Automated tests failed! Build aborted.
-    pause
-    exit /b %ERRORLEVEL%
+setlocal
+echo =========================================
+echo   NUP Extractor - Native Build ^& Test
+echo =========================================
+
+where cargo >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Native toolchain ^(cargo^) not found in PATH.
+    exit /b 1
 )
 
+echo [1/4] Checking code formatting...
+cargo fmt --all -- --check
+if errorlevel 1 exit /b 1
+
+echo [2/4] Running Clippy lints...
+cargo clippy --workspace --all-targets -- -D warnings
+if errorlevel 1 exit /b 1
+
+echo [3/4] Running workspace test suite...
+cargo test --workspace
+if errorlevel 1 exit /b 1
+
+echo [4/4] Building standalone release executable...
+cargo build --release -p nup-extractor
+if errorlevel 1 exit /b 1
+
+copy /Y "target\release\NUP_Extractor.exe" "NUP_Extractor.exe" >nul
 echo.
-echo ========================================================
-echo   ALL TESTS PASSED! COMPILING STANDALONE EXECUTABLE
-echo ========================================================
-dotnet publish src_native -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o dist_native
-if %ERRORLEVEL% equ 0 (
-    copy /Y dist_native\NupExtractorApp.exe NUP_Extractor.exe
-    rmdir /S /Q dist_native
-    echo.
-    echo ========================================================
-    echo   BUILD SUCCESSFUL! Verified and updated NUP_Extractor.exe
-    echo ========================================================
-) else (
-    echo.
-    echo [!] Build failed!
-)
-pause
+echo [SUCCESS] Built standalone executable: NUP_Extractor.exe
+exit /b 0

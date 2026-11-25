@@ -1,8 +1,8 @@
 ## 📌 Description
-<!-- Provide a brief overview of the changes introduced in this Pull Request. -->
+<!-- Provide a concise overview of the changes introduced in this Pull Request. -->
 
 ## 🔗 Related Issue / Kanban Card
-<!-- Link the issue or Kanban card this PR resolves (e.g. Closes #12, Fixes #34) -->
+<!-- Link the issue or Kanban card this PR resolves (e.g. Closes #8, Fixes #12) -->
 Closes #
 
 ## 🛠️ Type of Change
@@ -10,12 +10,11 @@ Closes #
 - [ ] ✨ New feature (non-breaking change adding functionality)
 - [ ] ⚡ Performance improvement
 - [ ] ♻️ Code refactoring / Cleanup
-- [ ] 📝 Documentation update
+- [ ] 📝 Documentation / Website update
 
 ## ✅ Pre-Merge Checklist
-- [ ] My code follows the repository's coding standards.
-- [ ] All new and existing unit tests pass locally (`dotnet test NupExtractor.slnx`).
-- [ ] Standalone release packaging succeeds (`dotnet publish src_native/NupExtractorApp.csproj ...`).
+- [ ] Formatting & lints pass locally (`cargo fmt --all -- --check` and `cargo clippy --workspace --all-targets -- -D warnings`).
+- [ ] All automated tests pass locally (`cargo test --workspace` and `dotnet test legacy_dotnet/NupExtractor.slnx -c Release`).
+- [ ] Standalone release executable builds cleanly (`cargo build --release -p nup-extractor`).
 - [ ] CI Verification workflow passes with green checks.
-- [ ] Ready for review and merge into the `develop` branch.
-
+- [ ] Ready for review and merge.

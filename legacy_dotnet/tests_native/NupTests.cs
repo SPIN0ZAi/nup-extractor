@@ -14,7 +14,7 @@ namespace NupExtractorApp.Tests;
 
 public class NupTests
 {
-    private static readonly string SampleNupPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../sample_game.nup"));
+    private static readonly string SampleNupPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../sample_game.nup"));
 
     [Fact]
     public void Test_Superblock_Parsing_ValidContainer()
@@ -752,7 +752,7 @@ public class NupTests
     [Fact]
     public void Test_StaticAssets_JavaScriptSyntaxValidation()
     {
-        string jsPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../static/app.js"));
+        string jsPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../static/app.js"));
         Assert.True(File.Exists(jsPath), $"app.js not found at {jsPath}");
 
         string jsContent = File.ReadAllText(jsPath);
