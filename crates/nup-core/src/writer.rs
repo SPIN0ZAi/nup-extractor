@@ -52,10 +52,10 @@ impl Default for PackOptions {
         Self {
             source_directory: String::new(),
             output_file_path: String::new(),
-            title_name: "Custom Game".to_string(),
-            publisher: "Homebrew / Mod".to_string(),
+            title_name: String::new(),
+            publisher: String::new(),
             title_id: 0,
-            version_string: "1.0.0".to_string(),
+            version_string: String::new(),
             compression_level: 3,
             icon_path: None,
         }
@@ -118,6 +118,7 @@ struct DiscoveredPackage {
     version: u32,
     flags: u8,
     display_name: String,
+    natural_display_version: Option<String>,
     root_dir_index: usize,
     exefs_dir_index: u32,
     romfs_dir_index: u32,
@@ -164,8 +165,10 @@ pub fn detect_package_summary(source_directory: &str) -> Vec<DetectedPackageSumm
                 .as_deref()
                 .map(parse_nacp_info)
                 .unwrap_or_default();
-            let detected_version = nacp.version.or_else(|| {
-                if p.kind == NupConstants::KIND_UPDATE && p.version != 0 {
+            let detected_version = p.natural_display_version.or_else(|| {
+                if (p.kind == NupConstants::KIND_UPDATE || p.kind == NupConstants::KIND_ADDON)
+                    && p.version != 0
+                {
                     Some(format_version(p.version))
                 } else {
                     None
@@ -341,9 +344,23 @@ where
     let toc_offset = NupConstants::HEADER_SIZE as u64;
     let blob_offset = align_up(toc_offset + toc_size as u64, NupConstants::EXTENT_ALIGN);
 
-    // Prepare per-package TLV metadata (written after the blob extents per SPEC §5 & pack.py)
+    // Prepare per-package TLV metadata (written after the blob extents per SPEC §5 & Lichii)
+    let target_app_idx = discovered
+        .iter()
+        .position(|p| p.kind == NupConstants::KIND_BASE)
+        .unwrap_or(0);
+    let newest_update_idx = discovered
+        .iter()
+        .enumerate()
+        .filter(|(_, p)| p.kind == NupConstants::KIND_UPDATE)
+        .rev()
+        .max_by_key(|(_, p)| p.version)
+        .map(|(idx, _)| idx);
     for (idx, pkg) in discovered.iter_mut().enumerate() {
-        pkg.meta_bytes = build_package_metadata(pkg, idx == 0, options);
+        let is_app_target = idx == target_app_idx;
+        let is_version_override_target = is_app_target || Some(idx) == newest_update_idx;
+        pkg.meta_bytes =
+            build_package_metadata(pkg, is_app_target, is_version_override_target, options);
     }
 
     let raw_file = OpenOptions::new()
@@ -1584,6 +1601,198 @@ fn resolve_base_title_id(override_id: u64, npdm_id: u64) -> u64 {
     }
 }
 
+fn aoc_base_title_id(base_tid: u64) -> u64 {
+    if base_tid != 0 {
+        (base_tid & 0xFFFF_FFFF_FFFF_E000) | 0x1000
+    } else {
+        PLACEHOLDER_TITLE_ID
+    }
+}
+
+fn extract_hex16_tid(name: &str) -> Option<u64> {
+    let trimmed = name.trim();
+    if trimmed.len() == 16
+        && let Ok(tid) = u64::from_str_radix(trimmed, 16)
+    {
+        return Some(tid);
+    }
+    let bytes = trimmed.as_bytes();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        if !bytes[i].is_ascii_hexdigit() {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        while i < bytes.len() && bytes[i].is_ascii_hexdigit() {
+            i += 1;
+        }
+        if i - start == 16 {
+            let token = &trimmed[start..i];
+            if let Ok(tid) = u64::from_str_radix(token, 16)
+                && (token.starts_with("01") || token.starts_with("04"))
+            {
+                return Some(tid);
+            }
+        }
+    }
+    None
+}
+
+fn find_newest_product_tag(dir: &Path, prefix: &str) -> Option<String> {
+    let entries = fs::read_dir(dir).ok()?;
+    let prefix_len = prefix.len();
+    let mut best: Option<String> = None;
+    for entry in entries.flatten() {
+        let Ok(ft) = entry.file_type() else {
+            continue;
+        };
+        if !ft.is_file() {
+            continue;
+        }
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name.len() < prefix_len + 4 {
+            continue;
+        }
+        let Some(head) = name.get(..prefix_len) else {
+            continue;
+        };
+        if !head.eq_ignore_ascii_case(prefix) {
+            continue;
+        }
+        let Some(rest) = name.get(prefix_len..) else {
+            continue;
+        };
+        let bytes = rest.as_bytes();
+        if bytes.len() >= 4
+            && bytes[0].is_ascii_digit()
+            && bytes[1].is_ascii_digit()
+            && bytes[2].is_ascii_digit()
+            && bytes[3] == b'.'
+        {
+            let tag = rest[..3].to_string();
+            if best.as_ref().is_none_or(|b| tag > *b) {
+                best = Some(tag);
+            }
+        }
+    }
+    best
+}
+
+fn format_three_digit_tag(tag: &str) -> Option<String> {
+    let b = tag.trim().as_bytes();
+    if b.len() == 3 && b.iter().all(u8::is_ascii_digit) {
+        Some(format!("{}.{}.{}", b[0] - b'0', b[1] - b'0', b[2] - b'0'))
+    } else {
+        None
+    }
+}
+
+/// Detects loose-dump product version matching Lichii's `RomFSProductVersion` rules
+/// (`ResourceSizeTable.Product.<NNN>.*`, `GameDataList.Product.<NNN>.*`, and for add-ons
+/// `System/AoCUpgradeVersion.txt` / `System/Product.<NNN>.*`).
+fn try_detect_romfs_product_version(pkg_dir: &Path, is_addon: bool) -> Option<String> {
+    let romfs_dir = find_child_dir_ci(pkg_dir, "romfs").unwrap_or_else(|| pkg_dir.to_path_buf());
+    let mut best: Option<String> = None;
+
+    let system_dir = find_child_dir_ci(&romfs_dir, "system");
+    if let Some(ref sys) = system_dir
+        && let Some(resource_dir) = find_child_dir_ci(sys, "resource")
+        && let Some(tag) = find_newest_product_tag(&resource_dir, "ResourceSizeTable.Product.")
+    {
+        best = Some(tag);
+    }
+
+    if let Some(gamedata_dir) = find_child_dir_ci(&romfs_dir, "gamedata")
+        && let Some(tag) = find_newest_product_tag(&gamedata_dir, "GameDataList.Product.")
+        && best.as_ref().is_none_or(|b| tag > *b)
+    {
+        best = Some(tag);
+    }
+
+    if is_addon && let Some(ref sys) = system_dir {
+        if let Some(tag) = find_newest_product_tag(sys, "Product.")
+            && best.as_ref().is_none_or(|b| tag > *b)
+        {
+            best = Some(tag);
+        }
+        if let Some(upgrade_txt) = find_child_file_ci(sys, "AoCUpgradeVersion.txt")
+            && let Ok(text) = fs::read_to_string(&upgrade_txt)
+        {
+            let trimmed = text.trim();
+            if let Some(formatted) = format_three_digit_tag(trimmed) {
+                return Some(
+                    best.and_then(|t| format_three_digit_tag(&t))
+                        .unwrap_or(formatted),
+                );
+            }
+            if !trimmed.is_empty() && trimmed.len() <= 15 {
+                return Some(trimmed.to_string());
+            }
+        }
+    }
+
+    best.and_then(|tag| format_three_digit_tag(&tag))
+}
+
+fn detect_natural_display_version(pkg_dir: &Path, is_addon: bool) -> Option<String> {
+    if let Some(nacp) = try_read_nacp_bytes(pkg_dir)
+        && let Some(ver) = parse_nacp_info(&nacp).version
+    {
+        return Some(ver);
+    }
+    try_detect_romfs_product_version(pkg_dir, is_addon)
+}
+
+fn parse_dotted_version(clean: &str) -> Option<u32> {
+    let mut parts = clean.split('.');
+    let major = parts.next()?.parse::<u32>().ok()?;
+    let minor = parts
+        .next()
+        .and_then(|s| s.parse::<u32>().ok())
+        .unwrap_or(0);
+    let patch = parts
+        .next()
+        .and_then(|s| s.parse::<u32>().ok())
+        .unwrap_or(0);
+    Some((major << 16) | ((minor & 0xFF) << 8) | (patch & 0xFF))
+}
+
+fn parse_update_folder_version(name: &str) -> (u32, Option<String>) {
+    let trimmed = name.trim();
+    let clean = trimmed.trim_start_matches(['v', 'V']);
+    let clean = clean.split('-').next().unwrap_or(clean);
+    if clean.contains('.')
+        && let Some(v) = parse_dotted_version(clean)
+    {
+        return (v, Some(format_version(v)));
+    }
+    if let Ok(num) = clean.parse::<u32>() {
+        return (num, None);
+    }
+    (65536, None)
+}
+
+fn parse_dlc_folder_version(name: &str, multiple_siblings: bool) -> (u32, Option<String>) {
+    let trimmed = name.trim();
+    let clean = trimmed.trim_start_matches(['v', 'V']);
+    let clean = clean.split('-').next().unwrap_or(clean);
+    if clean.contains('.')
+        && let Some(v) = parse_dotted_version(clean)
+    {
+        return (v, Some(format_version(v)));
+    }
+    if let Ok(num) = clean.parse::<u32>() {
+        if num >= 65536 {
+            return (num, Some(format_version(num)));
+        }
+        if multiple_siblings || trimmed.starts_with(['v', 'V']) {
+            return (num, None);
+        }
+    }
+    (0, None)
+}
+
 fn derive_uuid(packages: &[DiscoveredPackage]) -> [u8; 16] {
     let mut hasher = Sha256::new();
     let mut buf = [0u8; 13];
@@ -1599,6 +1808,31 @@ fn derive_uuid(packages: &[DiscoveredPackage]) -> [u8; 16] {
     uuid
 }
 
+fn make_addon_package(
+    source_path: PathBuf,
+    title_id: u64,
+    version: u32,
+    folder_display_version: Option<String>,
+    title_name: &str,
+    label: &str,
+) -> DiscoveredPackage {
+    let natural = detect_natural_display_version(&source_path, true).or(folder_display_version);
+    DiscoveredPackage {
+        kind: NupConstants::KIND_ADDON,
+        source_path,
+        title_id,
+        version,
+        flags: 0,
+        display_name: format!("{title_name} (DLC {label})"),
+        natural_display_version: natural,
+        root_dir_index: 0,
+        exefs_dir_index: NupConstants::NO_DIR,
+        romfs_dir_index: NupConstants::NO_DIR,
+        meta_bytes: Vec::new(),
+        exclude_top_dirs: &[],
+    }
+}
+
 fn discover_packages(options: &PackOptions) -> NupResult<Vec<DiscoveredPackage>> {
     let src = PathBuf::from(&options.source_directory);
     if !src.is_dir() {
@@ -1606,6 +1840,15 @@ fn discover_packages(options: &PackOptions) -> NupResult<Vec<DiscoveredPackage>>
             options.source_directory.clone(),
         ));
     }
+
+    let effective_title = if !options.title_name.trim().is_empty() {
+        options.title_name.clone()
+    } else {
+        src.file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| "Custom Game".to_string())
+    };
 
     let mut list = Vec::new();
     let base_dir_opt = find_child_dir_ci(&src, "base").filter(|p| directory_has_files(p));
@@ -1618,13 +1861,15 @@ fn discover_packages(options: &PackOptions) -> NupResult<Vec<DiscoveredPackage>>
     if let Some(base_dir) = base_dir_opt {
         let npdm_id = try_parse_npdm_program_id(&base_dir);
         base_title_id = resolve_base_title_id(base_title_id, npdm_id);
+        let natural = detect_natural_display_version(&base_dir, false);
         list.push(DiscoveredPackage {
             kind: NupConstants::KIND_BASE,
             source_path: base_dir,
             title_id: base_title_id,
-            version: parse_version_string(&options.version_string),
+            version: 0,
             flags: 0,
-            display_name: options.title_name.clone(),
+            display_name: effective_title.clone(),
+            natural_display_version: natural,
             root_dir_index: 0,
             exefs_dir_index: NupConstants::NO_DIR,
             romfs_dir_index: NupConstants::NO_DIR,
@@ -1636,13 +1881,15 @@ fn discover_packages(options: &PackOptions) -> NupResult<Vec<DiscoveredPackage>>
         let npdm_id = try_parse_npdm_program_id(&src);
         base_title_id = resolve_base_title_id(base_title_id, npdm_id);
         has_base = true;
+        let natural = detect_natural_display_version(&src, false);
         list.push(DiscoveredPackage {
             kind: NupConstants::KIND_BASE,
             source_path: src.clone(),
             title_id: base_title_id,
-            version: parse_version_string(&options.version_string),
+            version: 0,
             flags: 0,
-            display_name: options.title_name.clone(),
+            display_name: effective_title.clone(),
+            natural_display_version: natural,
             root_dir_index: 0,
             exefs_dir_index: NupConstants::NO_DIR,
             romfs_dir_index: NupConstants::NO_DIR,
@@ -1668,36 +1915,37 @@ fn discover_packages(options: &PackOptions) -> NupResult<Vec<DiscoveredPackage>>
                 .file_name()
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_default();
-            (name.parse::<u32>().unwrap_or(u32::MAX), name.into_bytes())
+            let (ver, _) = parse_update_folder_version(&name);
+            (ver, name.into_bytes())
         });
 
-        if !sub_dirs.is_empty() {
+        if !sub_dirs.is_empty() && !has_package_subdirs(&updates_dir) {
             for upd_sub in sub_dirs {
                 let folder_name = upd_sub
                     .file_name()
                     .map(|n| n.to_string_lossy().into_owned())
                     .unwrap_or_default();
-                let ver = folder_name.parse::<u32>().unwrap_or_else(|_| {
-                    let parsed = parse_version_string(&folder_name);
-                    if parsed == 0 { 65536 } else { parsed }
-                });
-                let mut upd_tid = try_parse_npdm_program_id(&upd_sub);
-                if upd_tid == 0 {
-                    if base_title_id != 0 && (base_title_id & 0xFFF) == 0 {
-                        upd_tid = base_title_id | 0x800;
-                    } else if base_title_id != 0 {
-                        upd_tid = base_title_id;
-                    } else if options.title_id != 0 {
-                        upd_tid = options.title_id;
-                    }
+                let (ver, folder_disp) = parse_update_folder_version(&folder_name);
+                let npdm_tid = try_parse_npdm_program_id(&upd_sub);
+                let upd_tid = if npdm_tid != 0 {
+                    npdm_tid
+                } else if base_title_id != 0 {
+                    base_title_id
+                } else {
+                    options.title_id
+                };
+                if base_title_id == 0 && upd_tid != 0 {
+                    base_title_id = upd_tid;
                 }
+                let natural = detect_natural_display_version(&upd_sub, false).or(folder_disp);
                 list.push(DiscoveredPackage {
                     kind: NupConstants::KIND_UPDATE,
                     source_path: upd_sub,
                     title_id: upd_tid,
                     version: ver,
                     flags: update_flags,
-                    display_name: format!("{} (Update v{folder_name})", options.title_name),
+                    display_name: format!("{effective_title} (Update v{folder_name})"),
+                    natural_display_version: natural,
                     root_dir_index: 0,
                     exefs_dir_index: NupConstants::NO_DIR,
                     romfs_dir_index: NupConstants::NO_DIR,
@@ -1706,25 +1954,26 @@ fn discover_packages(options: &PackOptions) -> NupResult<Vec<DiscoveredPackage>>
                 });
             }
         } else {
-            let mut upd_tid = try_parse_npdm_program_id(&updates_dir);
-            if upd_tid == 0 {
-                if base_title_id != 0 && (base_title_id & 0xFFF) == 0 {
-                    upd_tid = base_title_id | 0x800;
-                } else {
-                    upd_tid = if base_title_id != 0 {
-                        base_title_id
-                    } else {
-                        options.title_id
-                    };
-                }
+            let npdm_tid = try_parse_npdm_program_id(&updates_dir);
+            let upd_tid = if npdm_tid != 0 {
+                npdm_tid
+            } else if base_title_id != 0 {
+                base_title_id
+            } else {
+                options.title_id
+            };
+            if base_title_id == 0 && upd_tid != 0 {
+                base_title_id = upd_tid;
             }
+            let natural = detect_natural_display_version(&updates_dir, false);
             list.push(DiscoveredPackage {
                 kind: NupConstants::KIND_UPDATE,
                 source_path: updates_dir,
                 title_id: upd_tid,
                 version: 65536,
                 flags: update_flags,
-                display_name: format!("{} (Update)", options.title_name),
+                display_name: format!("{effective_title} (Update)"),
+                natural_display_version: natural,
                 root_dir_index: 0,
                 exefs_dir_index: NupConstants::NO_DIR,
                 romfs_dir_index: NupConstants::NO_DIR,
@@ -1735,88 +1984,105 @@ fn discover_packages(options: &PackOptions) -> NupResult<Vec<DiscoveredPackage>>
     }
 
     if let Some(dlc_dir) = dlc_dir_opt {
-        let mut dlc_subs: Vec<PathBuf> = fs::read_dir(&dlc_dir)?
-            .flatten()
-            .filter(|e| e.file_type().is_ok_and(|ft| ft.is_dir()))
-            .map(|e| e.path())
-            .collect();
-        dlc_subs.sort_by_key(|p| {
-            p.file_name()
-                .map(|n| n.to_string_lossy().into_owned().into_bytes())
-                .unwrap_or_default()
+        let aoc_base = aoc_base_title_id(if base_title_id != 0 {
+            base_title_id
+        } else {
+            options.title_id
         });
+        if has_package_subdirs(&dlc_dir) {
+            list.push(make_addon_package(
+                dlc_dir,
+                aoc_base + 1,
+                0,
+                None,
+                &effective_title,
+                "1",
+            ));
+        } else {
+            let mut dlc_subs: Vec<PathBuf> = fs::read_dir(&dlc_dir)?
+                .flatten()
+                .filter(|e| e.file_type().is_ok_and(|ft| ft.is_dir()))
+                .map(|e| e.path())
+                .collect();
+            dlc_subs.sort_by_key(|p| {
+                p.file_name()
+                    .map(|n| n.to_string_lossy().into_owned().into_bytes())
+                    .unwrap_or_default()
+            });
 
-        let mut dlc_counter: u64 = 1;
-        for sub in dlc_subs {
-            let name = sub
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            if name.len() == 16
-                && let Ok(hex_id) = u64::from_str_radix(&name, 16)
-            {
-                let mut idx_dirs: Vec<PathBuf> = fs::read_dir(&sub)?
-                    .flatten()
-                    .filter(|e| e.file_type().is_ok_and(|ft| ft.is_dir()))
-                    .map(|e| e.path())
-                    .filter(|p| directory_has_files(p))
-                    .collect();
-                idx_dirs.sort_by_key(|p| {
-                    p.file_name()
-                        .map(|n| n.to_string_lossy().into_owned().into_bytes())
-                        .unwrap_or_default()
-                });
-                if !idx_dirs.is_empty() {
-                    for idir in idx_dirs {
-                        list.push(DiscoveredPackage {
-                            kind: NupConstants::KIND_ADDON,
-                            source_path: idir,
-                            title_id: hex_id,
-                            version: 0,
-                            flags: 0,
-                            display_name: format!("{} (DLC {name})", options.title_name),
-                            root_dir_index: 0,
-                            exefs_dir_index: NupConstants::NO_DIR,
-                            romfs_dir_index: NupConstants::NO_DIR,
-                            meta_bytes: Vec::new(),
-                            exclude_top_dirs: &[],
-                        });
+            let mut dlc_counter: u64 = 1;
+            for sub in dlc_subs {
+                let name = sub
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                if let Some(hex_id) = extract_hex16_tid(&name) {
+                    if has_package_subdirs(&sub) {
+                        list.push(make_addon_package(
+                            sub,
+                            hex_id,
+                            0,
+                            None,
+                            &effective_title,
+                            &name,
+                        ));
+                        continue;
+                    }
+                    let mut idx_dirs: Vec<PathBuf> = fs::read_dir(&sub)?
+                        .flatten()
+                        .filter(|e| e.file_type().is_ok_and(|ft| ft.is_dir()))
+                        .map(|e| e.path())
+                        .filter(|p| directory_has_files(p))
+                        .collect();
+                    idx_dirs.sort_by_key(|p| {
+                        let iname = p
+                            .file_name()
+                            .map(|n| n.to_string_lossy().into_owned())
+                            .unwrap_or_default();
+                        let (ver, _) = parse_dlc_folder_version(&iname, true);
+                        (ver, iname.into_bytes())
+                    });
+                    if !idx_dirs.is_empty() {
+                        let multiple_siblings = idx_dirs.len() > 1;
+                        for idir in idx_dirs {
+                            let idx_name = idir
+                                .file_name()
+                                .map(|n| n.to_string_lossy().into_owned())
+                                .unwrap_or_default();
+                            let (ver, folder_disp) =
+                                parse_dlc_folder_version(&idx_name, multiple_siblings);
+                            list.push(make_addon_package(
+                                idir,
+                                hex_id,
+                                ver,
+                                folder_disp,
+                                &effective_title,
+                                &name,
+                            ));
+                        }
+                    } else if directory_has_files(&sub) {
+                        list.push(make_addon_package(
+                            sub,
+                            hex_id,
+                            0,
+                            None,
+                            &effective_title,
+                            &name,
+                        ));
                     }
                 } else if directory_has_files(&sub) {
-                    list.push(DiscoveredPackage {
-                        kind: NupConstants::KIND_ADDON,
-                        source_path: sub,
-                        title_id: hex_id,
-                        version: 0,
-                        flags: 0,
-                        display_name: format!("{} (DLC {name})", options.title_name),
-                        root_dir_index: 0,
-                        exefs_dir_index: NupConstants::NO_DIR,
-                        romfs_dir_index: NupConstants::NO_DIR,
-                        meta_bytes: Vec::new(),
-                        exclude_top_dirs: &[],
-                    });
+                    let tid = aoc_base + dlc_counter;
+                    let (ver, folder_disp) = parse_dlc_folder_version(&name, false);
+                    list.push(make_addon_package(
+                        sub,
+                        tid,
+                        ver,
+                        folder_disp,
+                        &effective_title,
+                        &name,
+                    ));
+                    dlc_counter += 1;
                 }
-            } else if directory_has_files(&sub) {
-                let tid = if base_title_id != 0 {
-                    base_title_id + dlc_counter
-                } else {
-                    options.title_id + dlc_counter
-                };
-                list.push(DiscoveredPackage {
-                    kind: NupConstants::KIND_ADDON,
-                    source_path: sub,
-                    title_id: tid,
-                    version: 0,
-                    flags: 0,
-                    display_name: format!("{} (DLC {name})", options.title_name),
-                    root_dir_index: 0,
-                    exefs_dir_index: NupConstants::NO_DIR,
-                    romfs_dir_index: NupConstants::NO_DIR,
-                    meta_bytes: Vec::new(),
-                    exclude_top_dirs: &[],
-                });
-                dlc_counter += 1;
             }
         }
     }
@@ -1824,13 +2090,15 @@ fn discover_packages(options: &PackOptions) -> NupResult<Vec<DiscoveredPackage>>
     if list.is_empty() {
         let npdm_id = try_parse_npdm_program_id(&src);
         let tid = resolve_base_title_id(options.title_id, npdm_id);
+        let natural = detect_natural_display_version(&src, false);
         list.push(DiscoveredPackage {
             kind: NupConstants::KIND_BASE,
             source_path: src,
             title_id: tid,
-            version: parse_version_string(&options.version_string),
+            version: 0,
             flags: 0,
-            display_name: options.title_name.clone(),
+            display_name: effective_title,
+            natural_display_version: natural,
             root_dir_index: 0,
             exefs_dir_index: NupConstants::NO_DIR,
             romfs_dir_index: NupConstants::NO_DIR,
@@ -1844,7 +2112,8 @@ fn discover_packages(options: &PackOptions) -> NupResult<Vec<DiscoveredPackage>>
 
 fn build_package_metadata(
     pkg: &DiscoveredPackage,
-    is_first_package: bool,
+    is_app_target: bool,
+    is_version_override_target: bool,
     options: &PackOptions,
 ) -> Vec<u8> {
     let mut tlvs: Vec<(u16, Vec<u8>)> = Vec::new();
@@ -1870,8 +2139,8 @@ fn build_package_metadata(
         tlvs.push((NupConstants::TLV_NACP, nacp));
     }
 
-    // Application display metadata belongs on Base, or first package for base-less containers
-    if pkg.kind == NupConstants::KIND_BASE || is_first_package {
+    // Application-wide metadata lives on Base (or first package when there is no Base)
+    if is_app_target {
         if let Some(ref icon_p) = options.icon_path
             && let Ok(bytes) = fs::read(icon_p)
             && !bytes.is_empty()
@@ -1881,35 +2150,47 @@ fn build_package_metadata(
             tlvs.push((NupConstants::TLV_ICON, sidecar_icon));
         }
 
-        if !options.version_string.is_empty() {
-            tlvs.push((
-                NupConstants::TLV_DISPLAY_VERSION,
-                options.version_string.as_bytes().to_vec(),
-            ));
-        } else if let Some(ver) = nacp_info.version {
-            tlvs.push((NupConstants::TLV_DISPLAY_VERSION, ver.into_bytes()));
-        }
-
-        if !options.title_name.is_empty() {
+        let explicit_title = options.title_name.trim();
+        if !explicit_title.is_empty() {
             tlvs.push((
                 NupConstants::TLV_TITLE_NAME,
-                options.title_name.as_bytes().to_vec(),
+                explicit_title.as_bytes().to_vec(),
             ));
         } else if let Some(title) = nacp_info.title {
             tlvs.push((NupConstants::TLV_TITLE_NAME, title.into_bytes()));
+        } else if !pkg.display_name.trim().is_empty() {
+            tlvs.push((
+                NupConstants::TLV_TITLE_NAME,
+                pkg.display_name.trim().as_bytes().to_vec(),
+            ));
         }
 
-        if !options.publisher.is_empty() {
+        let explicit_pub = options.publisher.trim();
+        if !explicit_pub.is_empty() {
             tlvs.push((
                 NupConstants::TLV_PUBLISHER,
-                options.publisher.as_bytes().to_vec(),
+                explicit_pub.as_bytes().to_vec(),
             ));
         } else if let Some(pub_name) = nacp_info.publisher {
             tlvs.push((NupConstants::TLV_PUBLISHER, pub_name.into_bytes()));
+        } else {
+            tlvs.push((NupConstants::TLV_PUBLISHER, b"Homebrew / Mod".to_vec()));
         }
-    } else if pkg.kind == NupConstants::KIND_UPDATE {
-        let ver_str = format_version(pkg.version);
-        tlvs.push((NupConstants::TLV_DISPLAY_VERSION, ver_str.into_bytes()));
+    }
+
+    let explicit_ver = options.version_string.trim();
+    if is_version_override_target && !explicit_ver.is_empty() {
+        tlvs.push((
+            NupConstants::TLV_DISPLAY_VERSION,
+            explicit_ver.as_bytes().to_vec(),
+        ));
+    } else if let Some(ref nat_ver) = pkg.natural_display_version {
+        tlvs.push((
+            NupConstants::TLV_DISPLAY_VERSION,
+            nat_ver.as_bytes().to_vec(),
+        ));
+    } else if is_app_target && pkg.kind == NupConstants::KIND_BASE {
+        tlvs.push((NupConstants::TLV_DISPLAY_VERSION, b"1.0.0".to_vec()));
     }
 
     if let Some(bid) = try_read_build_id(&pkg.source_path) {
@@ -1946,25 +2227,6 @@ fn format_version(version: u32) -> String {
         (version >> 8) & 0xFF,
         version & 0xFF
     )
-}
-
-fn parse_version_string(ver: &str) -> u32 {
-    let clean = ver.trim().trim_start_matches(['v', 'V']);
-    let clean = clean.split('-').next().unwrap_or(clean);
-    let mut parts = clean.split('.');
-    let major = parts
-        .next()
-        .and_then(|s| s.parse::<u32>().ok())
-        .unwrap_or(1);
-    let minor = parts
-        .next()
-        .and_then(|s| s.parse::<u32>().ok())
-        .unwrap_or(0);
-    let patch = parts
-        .next()
-        .and_then(|s| s.parse::<u32>().ok())
-        .unwrap_or(0);
-    (major << 16) | (minor << 8) | patch
 }
 
 fn align_up(value: u64, alignment: u64) -> u64 {

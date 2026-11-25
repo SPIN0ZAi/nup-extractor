@@ -8,8 +8,8 @@ use std::sync::atomic::AtomicBool;
 use nup_core::path_safety::validate_and_join_extraction_path;
 use nup_core::{
     NupConstants, NupReader, PackOptions, PackProgressInfo, ProgressInfo, VerifyProgressInfo,
-    check_disk_space, extract, extract_single_file, get_dir_children, inspect, pack, search_files,
-    verify,
+    check_disk_space, detect_package_summary, extract, extract_single_file, get_dir_children,
+    inspect, pack, search_files, verify,
 };
 use proptest::prelude::*;
 use sha2::{Digest, Sha256};
@@ -872,6 +872,208 @@ fn test_writer_streaming_large_file_path_compressible_and_incompressible() {
     )
     .unwrap();
     assert!(verify_done.unwrap().valid);
+}
+
+#[test]
+fn test_writer_game_and_dlc_versions_and_layouts_roundtrip() {
+    let tmp = tempfile::tempdir().unwrap();
+    let src = tmp.path().join("BananzaBundle");
+
+    let switch2_pid: u64 = 0x0400_ABCD_0001_2001;
+    let mut npdm = vec![0u8; 0x100];
+    npdm[0x80..0x84].copy_from_slice(b"ACI0");
+    npdm[0x90..0x98].copy_from_slice(&switch2_pid.to_le_bytes());
+
+    // Base: Product.100 -> 1.0.0, Update 458752 -> GameDataList.Product.320.* -> 3.2.0
+    fs::create_dir_all(src.join("base/exefs")).unwrap();
+    fs::create_dir_all(src.join("base/romfs/GameData")).unwrap();
+    fs::write(src.join("base/exefs/main"), b"base_main").unwrap();
+    fs::write(src.join("base/exefs/main.npdm"), &npdm).unwrap();
+    fs::write(
+        src.join("base/romfs/GameData/GameDataList.Product.100.byml.zs"),
+        b"v1",
+    )
+    .unwrap();
+    fs::write(
+        src.join("base/romfs/GameData/GameDataList.Product.rsizetable.zs"),
+        b"unversioned",
+    )
+    .unwrap();
+
+    fs::create_dir_all(src.join("updates/458752/exefs")).unwrap();
+    fs::create_dir_all(src.join("updates/458752/romfs/GameData")).unwrap();
+    fs::write(src.join("updates/458752/exefs/main"), b"upd_main").unwrap();
+    fs::write(src.join("updates/458752/exefs/main.npdm"), &npdm).unwrap();
+    fs::write(
+        src.join("updates/458752/romfs/GameData/GameDataList.Product.320.byml.zs"),
+        b"v320",
+    )
+    .unwrap();
+
+    // DLC 1: Versioned Switch folder `65536` (1.0.0) with AoCUpgradeVersion 1.2.0
+    fs::create_dir_all(src.join("dlc/0100ABCD00011001/65536/romfs/System")).unwrap();
+    fs::write(
+        src.join("dlc/0100ABCD00011001/65536/romfs/System/AoCUpgradeVersion.txt"),
+        b"120",
+    )
+    .unwrap();
+
+    // DLC 2: Direct `romfs/` directly inside 16-hex TID without index subfolder
+    fs::create_dir_all(src.join("dlc/0100ABCD00011002/romfs")).unwrap();
+    fs::write(
+        src.join("dlc/0100ABCD00011002/romfs/costume.dat"),
+        b"direct",
+    )
+    .unwrap();
+
+    // DLC 3: Versioned folder `131072` (2.0.0) without NACP/Product tag
+    fs::create_dir_all(src.join("dlc/0100ABCD00011003/131072/romfs")).unwrap();
+    fs::write(
+        src.join("dlc/0100ABCD00011003/131072/romfs/pack.dat"),
+        b"v2dlc",
+    )
+    .unwrap();
+
+    // DLC 4: Non-hex folder name must derive AoC TID `(base & !0x1FFF) | 0x1000 + 1` (0400ABCD00013001)
+    fs::create_dir_all(src.join("dlc/BonusPack/romfs")).unwrap();
+    fs::write(src.join("dlc/BonusPack/romfs/bonus.dat"), b"bonus").unwrap();
+
+    let summary = detect_package_summary(&pstr(&src));
+    assert_eq!(summary.len(), 6);
+    assert_eq!(summary[0].detected_version.as_deref(), Some("1.0.0"));
+    assert_eq!(summary[1].detected_version.as_deref(), Some("3.2.0"));
+    assert_eq!(summary[2].detected_version.as_deref(), Some("1.2.0"));
+
+    let out = tmp.path().join("bananza_bundle.nup");
+    let cancel = AtomicBool::new(false);
+    pack(
+        &PackOptions {
+            source_directory: pstr(&src),
+            output_file_path: pstr(&out),
+            ..PackOptions::default()
+        },
+        |_| {},
+        &cancel,
+    )
+    .unwrap();
+
+    let reader = NupReader::open(&out).unwrap();
+    assert_eq!(reader.packages.len(), 6);
+
+    // Base uses version == 0 numerically + display_version "1.0.0"
+    let base = &reader.packages[0];
+    assert_eq!(base.kind, NupConstants::KIND_BASE);
+    assert_eq!(base.version, 0);
+    assert_eq!(
+        reader.get_package_metadata(base)[&NupConstants::TLV_DISPLAY_VERSION],
+        b"1.0.0"
+    );
+
+    // Update 458752 uses display_version "3.2.0" (NOT bit-shifted "7.0.0") and matching Title ID
+    let upd = &reader.packages[1];
+    assert_eq!(upd.kind, NupConstants::KIND_UPDATE);
+    assert_eq!(upd.version, 458752);
+    assert_eq!(upd.title_id, switch2_pid);
+    assert_eq!(
+        reader.get_package_metadata(upd)[&NupConstants::TLV_DISPLAY_VERSION],
+        b"3.2.0"
+    );
+
+    // DLCs preserve romfs_dir_index, true AoC Title IDs, and versions
+    let dlc1 = reader
+        .packages
+        .iter()
+        .find(|p| p.title_id == 0x0100_ABCD_0001_1001)
+        .unwrap();
+    assert_eq!(dlc1.version, 65536);
+    assert_eq!(
+        reader.get_package_metadata(dlc1)[&NupConstants::TLV_DISPLAY_VERSION],
+        b"1.2.0"
+    );
+
+    let dlc2 = reader
+        .packages
+        .iter()
+        .find(|p| p.title_id == 0x0100_ABCD_0001_1002)
+        .unwrap();
+    assert_ne!(
+        dlc2.rom_fs_dir,
+        NupConstants::NO_DIR,
+        "direct dlc/<tid>/romfs must preserve romfs_dir"
+    );
+
+    let dlc3 = reader
+        .packages
+        .iter()
+        .find(|p| p.title_id == 0x0100_ABCD_0001_1003)
+        .unwrap();
+    assert_eq!(dlc3.version, 131072);
+    assert_eq!(
+        reader.get_package_metadata(dlc3)[&NupConstants::TLV_DISPLAY_VERSION],
+        b"2.0.0"
+    );
+
+    let dlc4 = reader
+        .packages
+        .iter()
+        .find(|p| p.title_id == 0x0400_ABCD_0001_3001)
+        .unwrap();
+    assert_ne!(dlc4.rom_fs_dir, NupConstants::NO_DIR);
+
+    // Extract -> Repack round-trip keeps versioned DLC versions (`65536` / `131072`) intact
+    let extracted = tmp.path().join("extracted");
+    extract(
+        &pstr(&out),
+        &pstr(&extracted),
+        "all",
+        None,
+        None,
+        |_| {},
+        &cancel,
+    )
+    .unwrap();
+    assert!(
+        extracted
+            .join("dlc/0100abcd00011001/65536/romfs/System/AoCUpgradeVersion.txt")
+            .is_file()
+    );
+    assert!(
+        extracted
+            .join("dlc/0100abcd00011003/131072/romfs/pack.dat")
+            .is_file()
+    );
+
+    let repacked = tmp.path().join("repacked.nup");
+    pack(
+        &PackOptions {
+            source_directory: pstr(&extracted),
+            output_file_path: pstr(&repacked),
+            ..PackOptions::default()
+        },
+        |_| {},
+        &cancel,
+    )
+    .unwrap();
+    let r2 = NupReader::open(&repacked).unwrap();
+    let r2_upd = r2
+        .packages
+        .iter()
+        .find(|p| p.kind == NupConstants::KIND_UPDATE)
+        .unwrap();
+    assert_eq!(
+        r2.get_package_metadata(r2_upd)[&NupConstants::TLV_DISPLAY_VERSION],
+        b"3.2.0"
+    );
+    let r2_dlc3 = r2
+        .packages
+        .iter()
+        .find(|p| p.title_id == 0x0100_ABCD_0001_1003)
+        .unwrap();
+    assert_eq!(r2_dlc3.version, 131072);
+    assert_eq!(
+        r2.get_package_metadata(r2_dlc3)[&NupConstants::TLV_DISPLAY_VERSION],
+        b"2.0.0"
+    );
 }
 
 proptest! {

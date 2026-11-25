@@ -888,9 +888,12 @@ function setPackSourceFolder(folderPath, folderName, opts = {}) {
                         }
                         pill.setAttribute("style", style);
                         const tidSuffix = p.titleIdHex && p.titleIdHex !== "0000000000000000" ? ` • ${p.titleIdHex}` : "";
+                        const updVer = p.detectedVersion || p.versionStr;
+                        const dlcVer = p.detectedVersion ? ` (${p.detectedVersion})` : "";
+                        const baseVer = p.detectedVersion ? ` (v${p.detectedVersion})` : "";
                         const label = p.kind === 1
-                            ? `Update (${p.versionStr})`
-                            : (p.kind === 2 ? `DLC${tidSuffix}` : `Base Game${tidSuffix}`);
+                            ? `Update (${updVer})`
+                            : (p.kind === 2 || p.kind === 3 ? `DLC${tidSuffix}${dlcVer}` : `Base Game${tidSuffix}${baseVer}`);
                         pill.textContent = `${icon} ${label}`;
                         packSourceDetected.appendChild(pill);
                     });
@@ -933,10 +936,12 @@ async function startPackaging() {
         return;
     }
 
-    const titleName = (packTitleInput && packTitleInput.value.trim()) || "Custom Game";
-    const publisher = (packPublisherInput && packPublisherInput.value.trim()) || "Homebrew / Mod";
+    const rawTitle = packTitleInput ? packTitleInput.value.trim() : "";
+    const titleName = (lastAutoPackTitle && rawTitle === lastAutoPackTitle) ? "" : rawTitle;
+    const publisher = packPublisherInput ? packPublisherInput.value.trim() : "";
     const titleId = (packTitleIdInput && packTitleIdInput.value.trim()) || "";
-    const version = (packVersionInput && packVersionInput.value.trim()) || "1.0.0";
+    const rawVer = packVersionInput ? packVersionInput.value.trim() : "";
+    const version = (lastAutoPackVersion && rawVer === lastAutoPackVersion) ? "" : rawVer;
     const compRadio = document.querySelector("input[name='pack-compression']:checked");
     const compressionLevel = compRadio ? parseInt(compRadio.value, 10) : 3;
 

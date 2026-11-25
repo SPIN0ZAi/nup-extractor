@@ -589,16 +589,9 @@ impl IpcRouter {
                     }));
                     return;
                 }
-                let default_title = Path::new(&source_dir)
-                    .file_name()
-                    .map(|n| n.to_string_lossy().into_owned())
-                    .unwrap_or_else(|| "Custom Game".to_string());
-                let title_name =
-                    get_str(&root, &["titleName", "title_name"]).unwrap_or(default_title);
-                let publisher =
-                    get_str(&root, &["publisher"]).unwrap_or_else(|| "Homebrew / Mod".to_string());
-                let version_str =
-                    get_str(&root, &["version"]).unwrap_or_else(|| "1.0.0".to_string());
+                let title_name = get_str(&root, &["titleName", "title_name"]).unwrap_or_default();
+                let publisher = get_str(&root, &["publisher"]).unwrap_or_default();
+                let version_str = get_str(&root, &["version"]).unwrap_or_default();
                 let compression_level =
                     get_i64(&root, &["compressionLevel", "compression_level"]).unwrap_or(3) as i32;
                 let mut title_id = 0u64;
