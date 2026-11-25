@@ -601,7 +601,7 @@ impl IpcRouter {
                     get_str(&root, &["version"]).unwrap_or_else(|| "1.0.0".to_string());
                 let compression_level =
                     get_i64(&root, &["compressionLevel", "compression_level"]).unwrap_or(3) as i32;
-                let mut title_id = 0x0100_0000_0000_1000u64;
+                let mut title_id = 0u64;
                 if let Some(tid_s) = get_str(&root, &["titleId", "title_id"]) {
                     let clean = tid_s
                         .trim()

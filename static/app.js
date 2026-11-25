@@ -220,6 +220,8 @@ let selectedPackSourceDir = null;
 let lastPackedOutputFile = null;
 let lastAutoPackTitle = "";
 let lastAutoPackDest = "";
+let lastAutoPackTitleId = "";
+let lastAutoPackVersion = "";
 let packInspectSeq = 0;
 
 // Pack Modal Elements
@@ -754,6 +756,8 @@ function clearPackForm(opts = {}) {
     selectedPackSourceDir = null;
     lastAutoPackTitle = "";
     lastAutoPackDest = "";
+    lastAutoPackTitleId = "";
+    lastAutoPackVersion = "";
 
     if (!opts.preserveInput && packSourceInput) packSourceInput.value = "";
     if (btnClearPackSource) btnClearPackSource.style.display = "none";
@@ -819,6 +823,8 @@ function setPackSourceFolder(folderPath, folderName, opts = {}) {
     if (isSwitchingFolder) {
         if (packTitleIdInput) packTitleIdInput.value = "";
         if (packVersionInput) packVersionInput.value = "";
+        lastAutoPackTitleId = "";
+        lastAutoPackVersion = "";
     }
 
     const packSourceDetected = document.getElementById("pack-source-detected");
@@ -828,25 +834,67 @@ function setPackSourceFolder(folderPath, folderName, opts = {}) {
     if (isNative) {
         nativeCall("inspect_pack_source", { sourceDir: cleanPath }, 300000).then(res => {
             if (reqSeq !== packInspectSeq) return;
-            if (res && res.packages && res.packages.length > 0 && packSourceDetected) {
-                packSourceDetected.innerHTML = "";
-                res.packages.forEach(p => {
-                    const pill = document.createElement("span");
-                    pill.className = "badge-tag";
-                    let icon = "🎮";
-                    let style = "background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.4); color: var(--switch-blue);";
-                    if (p.kind === 1) { // Update
-                        icon = "🔄";
-                        style = "background: rgba(234, 179, 8, 0.15); border-color: rgba(234, 179, 8, 0.4); color: #eab308;";
-                    } else if (p.kind === 2 || p.kind === 3) { // DLC
-                        icon = "💎";
-                        style = "background: rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.4); color: #a855f7;";
-                    }
-                    pill.setAttribute("style", style);
-                    const label = p.kind === 1 ? `Update (${p.versionStr})` : (p.kind === 2 ? `DLC` : `Base Game`);
-                    pill.textContent = `${icon} ${label}`;
-                    packSourceDetected.appendChild(pill);
-                });
+            if (res && res.packages && res.packages.length > 0) {
+                const primaryPkg = res.packages.find(p => p.kind === 0) || res.packages[0];
+                if (
+                    packTitleIdInput &&
+                    primaryPkg &&
+                    primaryPkg.titleIdHex &&
+                    primaryPkg.titleIdHex !== "0000000000000000" &&
+                    (!packTitleIdInput.value.trim() || packTitleIdInput.value.trim() === lastAutoPackTitleId)
+                ) {
+                    packTitleIdInput.value = primaryPkg.titleIdHex;
+                    lastAutoPackTitleId = primaryPkg.titleIdHex;
+                }
+                if (
+                    packTitleInput &&
+                    primaryPkg &&
+                    primaryPkg.detectedTitle &&
+                    (!packTitleInput.value.trim() || packTitleInput.value.trim() === lastAutoPackTitle)
+                ) {
+                    packTitleInput.value = primaryPkg.detectedTitle;
+                    lastAutoPackTitle = primaryPkg.detectedTitle;
+                }
+                if (packPublisherInput && primaryPkg && primaryPkg.detectedPublisher && !packPublisherInput.value.trim()) {
+                    packPublisherInput.value = primaryPkg.detectedPublisher;
+                }
+                const updatePkgs = res.packages.filter(p => p.kind === 1);
+                const latestUpd = updatePkgs.length > 0 ? updatePkgs[updatePkgs.length - 1] : null;
+                const autoVer = (latestUpd && (latestUpd.detectedVersion || latestUpd.versionStr))
+                    || (primaryPkg && primaryPkg.detectedVersion)
+                    || "";
+                if (
+                    packVersionInput &&
+                    autoVer &&
+                    (!packVersionInput.value.trim() || packVersionInput.value.trim() === lastAutoPackVersion)
+                ) {
+                    packVersionInput.value = autoVer;
+                    lastAutoPackVersion = autoVer;
+                }
+
+                if (packSourceDetected) {
+                    packSourceDetected.innerHTML = "";
+                    res.packages.forEach(p => {
+                        const pill = document.createElement("span");
+                        pill.className = "badge-tag";
+                        let icon = "🎮";
+                        let style = "background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.4); color: var(--switch-blue);";
+                        if (p.kind === 1) { // Update
+                            icon = "🔄";
+                            style = "background: rgba(234, 179, 8, 0.15); border-color: rgba(234, 179, 8, 0.4); color: #eab308;";
+                        } else if (p.kind === 2 || p.kind === 3) { // DLC
+                            icon = "💎";
+                            style = "background: rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.4); color: #a855f7;";
+                        }
+                        pill.setAttribute("style", style);
+                        const tidSuffix = p.titleIdHex && p.titleIdHex !== "0000000000000000" ? ` • ${p.titleIdHex}` : "";
+                        const label = p.kind === 1
+                            ? `Update (${p.versionStr})`
+                            : (p.kind === 2 ? `DLC${tidSuffix}` : `Base Game${tidSuffix}`);
+                        pill.textContent = `${icon} ${label}`;
+                        packSourceDetected.appendChild(pill);
+                    });
+                }
             }
         }).catch(() => {});
     }
@@ -887,7 +935,7 @@ async function startPackaging() {
 
     const titleName = (packTitleInput && packTitleInput.value.trim()) || "Custom Game";
     const publisher = (packPublisherInput && packPublisherInput.value.trim()) || "Homebrew / Mod";
-    const titleId = (packTitleIdInput && packTitleIdInput.value.trim()) || "0100000000001000";
+    const titleId = (packTitleIdInput && packTitleIdInput.value.trim()) || "";
     const version = (packVersionInput && packVersionInput.value.trim()) || "1.0.0";
     const compRadio = document.querySelector("input[name='pack-compression']:checked");
     const compressionLevel = compRadio ? parseInt(compRadio.value, 10) : 3;
