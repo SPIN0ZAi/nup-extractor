@@ -1,0 +1,175 @@
+{
+  "fixture": "base_only",
+  "queries": [
+    {
+      "query": "",
+      "results": [
+        {
+          "index": 0,
+          "name": "main",
+          "size": 512,
+          "size_formatted": "512 B",
+          "sizeFormatted": "512 B",
+          "extent_size": 314,
+          "extentSize": 314,
+          "extent_size_formatted": "314 B",
+          "extentSizeFormatted": "314 B",
+          "codec": "zstd",
+          "sha256": "25760451591d6ed2895e977e1c046b8b2543e84eb4ad2a3f1a870c6faf01f8a0"
+        },
+        {
+          "index": 1,
+          "name": "main.npdm",
+          "size": 64,
+          "size_formatted": "64 B",
+          "sizeFormatted": "64 B",
+          "extent_size": 36,
+          "extentSize": 36,
+          "extent_size_formatted": "36 B",
+          "extentSizeFormatted": "36 B",
+          "codec": "zstd",
+          "sha256": "76b3391ac90cbd8acaaf70b3618fe36edbba1ed94f311aa0b26a105c6daaeb6a"
+        },
+        {
+          "index": 2,
+          "name": "stage01.txt",
+          "size": 4080,
+          "size_formatted": "3.98 KB",
+          "sizeFormatted": "3.98 KB",
+          "extent_size": 52,
+          "extentSize": 52,
+          "extent_size_formatted": "52 B",
+          "extentSizeFormatted": "52 B",
+          "codec": "zstd",
+          "sha256": "64cf1408c1877069a06974ad259da86f4111cb03bb222fa48f44571189212e73"
+        },
+        {
+          "index": 3,
+          "name": "raw_blob.bin",
+          "size": 8,
+          "size_formatted": "8 B",
+          "sizeFormatted": "8 B",
+          "extent_size": 8,
+          "extentSize": 8,
+          "extent_size_formatted": "8 B",
+          "extentSizeFormatted": "8 B",
+          "codec": "raw",
+          "sha256": "0516bfb2fab718098d4d4e423a45ba30b111d845dd295a7760d8c7de122b31ab"
+        }
+      ]
+    },
+    {
+      "query": "a",
+      "results": [
+        {
+          "index": 0,
+          "name": "main",
+          "size": 512,
+          "size_formatted": "512 B",
+          "sizeFormatted": "512 B",
+          "extent_size": 314,
+          "extentSize": 314,
+          "extent_size_formatted": "314 B",
+          "extentSizeFormatted": "314 B",
+          "codec": "zstd",
+          "sha256": "25760451591d6ed2895e977e1c046b8b2543e84eb4ad2a3f1a870c6faf01f8a0"
+        },
+        {
+          "index": 1,
+          "name": "main.npdm",
+          "size": 64,
+          "size_formatted": "64 B",
+          "sizeFormatted": "64 B",
+          "extent_size": 36,
+          "extentSize": 36,
+          "extent_size_formatted": "36 B",
+          "extentSizeFormatted": "36 B",
+          "codec": "zstd",
+          "sha256": "76b3391ac90cbd8acaaf70b3618fe36edbba1ed94f311aa0b26a105c6daaeb6a"
+        },
+        {
+          "index": 2,
+          "name": "stage01.txt",
+          "size": 4080,
+          "size_formatted": "3.98 KB",
+          "sizeFormatted": "3.98 KB",
+          "extent_size": 52,
+          "extentSize": 52,
+          "extent_size_formatted": "52 B",
+          "extentSizeFormatted": "52 B",
+          "codec": "zstd",
+          "sha256": "64cf1408c1877069a06974ad259da86f4111cb03bb222fa48f44571189212e73"
+        },
+        {
+          "index": 3,
+          "name": "raw_blob.bin",
+          "size": 8,
+          "size_formatted": "8 B",
+          "sizeFormatted": "8 B",
+          "extent_size": 8,
+          "extentSize": 8,
+          "extent_size_formatted": "8 B",
+          "extentSizeFormatted": "8 B",
+          "codec": "raw",
+          "sha256": "0516bfb2fab718098d4d4e423a45ba30b111d845dd295a7760d8c7de122b31ab"
+        }
+      ]
+    },
+    {
+      "query": "LEVEL",
+      "results": []
+    },
+    {
+      "query": "level",
+      "results": []
+    },
+    {
+      "query": "\u65E5",
+      "results": []
+    },
+    {
+      "query": "caf\u00E9",
+      "results": []
+    },
+    {
+      "query": ".npdm",
+      "results": [
+        {
+          "index": 1,
+          "name": "main.npdm",
+          "size": 64,
+          "size_formatted": "64 B",
+          "sizeFormatted": "64 B",
+          "extent_size": 36,
+          "extentSize": 36,
+          "extent_size_formatted": "36 B",
+          "extentSizeFormatted": "36 B",
+          "codec": "zstd",
+          "sha256": "76b3391ac90cbd8acaaf70b3618fe36edbba1ed94f311aa0b26a105c6daaeb6a"
+        }
+      ]
+    },
+    {
+      "query": "nonexistent_xyz",
+      "results": []
+    },
+    {
+      "query": "0",
+      "results": [
+        {
+          "index": 2,
+          "name": "stage01.txt",
+          "size": 4080,
+          "size_formatted": "3.98 KB",
+          "sizeFormatted": "3.98 KB",
+          "extent_size": 52,
+          "extentSize": 52,
+          "extent_size_formatted": "52 B",
+          "extentSizeFormatted": "52 B",
+          "codec": "zstd",
+          "sha256": "64cf1408c1877069a06974ad259da86f4111cb03bb222fa48f44571189212e73"
+        }
+      ]
+    }
+  ]
+}

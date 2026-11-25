@@ -11,8 +11,20 @@ let extractSmoothedEta = null;
 let packStartTime = 0;
 let packSmoothedEta = null;
 
-// Native IPC Helper
-const isNative = typeof window.chrome !== "undefined" && typeof window.chrome.webview !== "undefined";
+// Native IPC Helper (via static/ipc.js transport shim)
+const hostBridge = window.NupHost || {
+    isNative: typeof window.chrome !== "undefined" && typeof window.chrome.webview !== "undefined",
+    postMessage: (p) => window.chrome?.webview?.postMessage(p),
+    postMessageWithFiles: (p, f) => {
+        if (typeof window.chrome?.webview?.postMessageWithAdditionalObjects === "function") {
+            window.chrome.webview.postMessageWithAdditionalObjects(p, f);
+            return true;
+        }
+        return false;
+    },
+    addMessageListener: (fn) => window.chrome?.webview?.addEventListener("message", (e) => fn(e.data))
+};
+const isNative = hostBridge.isNative;
 let nextRequestId = 1;
 const pendingRequests = new Map();
 
@@ -23,7 +35,7 @@ function nativeCall(action, params = {}) {
     return new Promise((resolve, reject) => {
         const id = `req_${nextRequestId++}`;
         pendingRequests.set(id, { resolve, reject });
-        window.chrome.webview.postMessage({ id, action, ...params });
+        hostBridge.postMessage({ id, action, ...params });
 
         setTimeout(() => {
             if (pendingRequests.has(id)) {
@@ -36,8 +48,7 @@ function nativeCall(action, params = {}) {
 
 // Global Native Message Dispatcher
 if (isNative) {
-    window.chrome.webview.addEventListener("message", (event) => {
-        const msg = event.data;
+    hostBridge.addMessageListener((msg) => {
         if (!msg) return;
 
         // Handle request-response
@@ -56,7 +67,22 @@ if (isNative) {
         const type = msg.type || msg.Type;
         const info = msg.info || msg.Info;
 
-        if (type === "extract_progress" && info) {
+        if (type === "morph_frame") {
+            onMorphFrame(msg);
+        } else if (type === "system_appearance") {
+            onSystemAppearance(msg);
+        } else if (type === "window_maximized_changed") {
+            document.body.classList.toggle("window-maximized", !!msg.maximized);
+        } else if (type === "load_dropped_file" && msg.filePath) {
+            switchAppMode("extract");
+            loadNup(msg.filePath);
+        } else if (type === "batch_extract_dropped_files" && Array.isArray(msg.files) && msg.files.length > 0) {
+            switchAppMode("extract");
+            startBatchExtraction(msg.files);
+        } else if (type === "load_dropped_pack_folder" && msg.folderPath) {
+            switchAppMode("pack");
+            setPackSourceFolder(msg.folderPath);
+        } else if (type === "extract_progress" && info) {
             onExtractProgress(info);
         } else if (type === "extract_done") {
             onExtractDone(msg);
@@ -297,6 +323,12 @@ function setupEventListeners() {
         e.preventDefault();
         dropzoneView.classList.remove("dragover");
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            if (isNative && hostBridge.postMessageWithFiles(
+                { action: "orb_file_drop", target: "dropzone" },
+                e.dataTransfer.files
+            )) {
+                return;
+            }
             const file = e.dataTransfer.files[0];
             if (file.path) {
                 loadNup(file.path);
@@ -478,6 +510,12 @@ function setupEventListeners() {
             e.preventDefault();
             packDropzone.classList.remove("dragover");
             if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                if (isNative && hostBridge.postMessageWithFiles(
+                    { action: "orb_file_drop", target: "pack" },
+                    e.dataTransfer.files
+                )) {
+                    return;
+                }
                 const item = e.dataTransfer.files[0];
                 if (item.path) {
                     setPackSourceFolder(item.path);
@@ -775,6 +813,8 @@ function onPackProgress(info) {
             addLogEntry(packLogBox, `[PACK] ${info.currentFile}`, "success");
         }
     }
+
+    updateOrbTaskProgress("pack", pct);
 }
 
 function onPackDone(msg) {
@@ -796,6 +836,7 @@ function onPackDone(msg) {
         addLogEntry(packLogBox, `✓ Container generated in ${timeSpent} and verified cleanly!`, "success");
     }
 
+    completeOrbTask("pack");
     showToast(`NUP Container built in ${timeSpent}!`);
 }
 
@@ -806,6 +847,7 @@ function onPackError(msg) {
     if (packLogBox) {
         addLogEntry(packLogBox, "ERROR: " + (msg.error || "Packaging failed"), "error");
     }
+    resetOrbTask();
 }
 
 // Native File Picker
@@ -853,7 +895,7 @@ function openFolder(folderPath) {
     if (!folderPath) return;
     try {
         if (isNative) {
-            window.chrome.webview.postMessage({ action: "open_folder", path: folderPath });
+            hostBridge.postMessage({ action: "open_folder", path: folderPath });
         } else {
             fetch("/api/open-folder", {
                 method: "POST",
@@ -867,8 +909,10 @@ function openFolder(folderPath) {
 }
 
 // Load and inspect a .NUP container
-async function loadNup(filePath) {
-    showToast("Parsing NUP container...");
+async function loadNup(filePath, opts = {}) {
+    if (!opts.silent) {
+        showToast("Parsing NUP container...");
+    }
     try {
         let data;
         if (isNative) {
@@ -892,11 +936,15 @@ async function loadNup(filePath) {
         activePackageIndex = 0;
 
         renderContainer();
-        const title = (data.primary_meta && data.primary_meta.title_name) ||
-                      (data.primaryMeta && data.primaryMeta.titleName) || "Game";
-        showToast(`Loaded: ${title}`);
+        if (!opts.silent) {
+            const title = (data.primary_meta && data.primary_meta.title_name) ||
+                          (data.primaryMeta && data.primaryMeta.titleName) || "Game";
+            showToast(`Loaded: ${title}`);
+        }
     } catch (err) {
-        alert("Error loading .NUP file: " + err.message);
+        if (!opts.silent) {
+            alert("Error loading .NUP file: " + err.message);
+        }
     }
 }
 
@@ -1240,6 +1288,143 @@ function renderSearchResults(results, q) {
     });
 }
 
+// Batch Drag-and-Drop Extraction Queue (Issue #8)
+let batchExtractQueue = null;
+
+function deriveStemExtractDir(filePath) {
+    const clean = String(filePath || "").replace(/[\\/]+$/, "");
+    const lastSlash = Math.max(clean.lastIndexOf("\\"), clean.lastIndexOf("/"));
+    const parent = lastSlash >= 0 ? clean.slice(0, lastSlash) : ".";
+    const name = lastSlash >= 0 ? clean.slice(lastSlash + 1) : clean;
+    const stem = name.replace(/\.nup$/i, "") || "nup";
+    const sep = clean.includes("/") && !clean.includes("\\") ? "/" : "\\";
+    return `${parent}${sep}${stem}_extracted`;
+}
+
+function startBatchExtraction(files) {
+    const list = Array.isArray(files)
+        ? files.filter(f => typeof f === "string" && f.trim().toLowerCase().endsWith(".nup"))
+        : [];
+    if (list.length === 0) return;
+
+    batchExtractQueue = {
+        files: list,
+        index: 0,
+        successCount: 0,
+        failedCount: 0,
+        startTime: Date.now(),
+        lastDestDir: deriveStemExtractDir(list[0])
+    };
+
+    lastExtractedDest = batchExtractQueue.lastDestDir;
+    extractModalPct.textContent = "0%";
+    extractProgressBar.style.width = "0%";
+    extractStatsFiles.textContent = `Preparing extraction (0/${list.length})...`;
+    extractStatsBytes.textContent = "0 B / 0 B";
+    extractCurrentFile.textContent = "Starting high-speed extraction...";
+    extractLogBox.innerHTML = "";
+    btnModalOpenFolder.style.display = "none";
+    btnModalClose.style.display = "none";
+    extractModal.classList.add("active");
+
+    addLogEntry(
+        extractLogBox,
+        `[BATCH] Queued ${list.length} container(s) for extraction (Base, Updates, & DLCs).`,
+        "info"
+    );
+
+    if (list.length === 1) {
+        loadNup(list[0], { silent: true }).catch(() => {});
+    }
+
+    dispatchNextBatchExtraction();
+}
+
+function dispatchNextBatchExtraction() {
+    if (!batchExtractQueue) return;
+    const idx = batchExtractQueue.index;
+    const total = batchExtractQueue.files.length;
+    const filePath = batchExtractQueue.files[idx];
+    const dest = deriveStemExtractDir(filePath);
+    const fileName = filePath.split(/[\\/]/).pop() || filePath;
+
+    batchExtractQueue.lastDestDir = dest;
+    lastExtractedDest = dest;
+    extractStartTime = Date.now();
+    extractSmoothedEta = null;
+
+    extractProgressBar.style.width = "0%";
+    extractModalPct.textContent = "0%";
+    extractStatsFiles.textContent = total > 1
+        ? `[${idx + 1}/${total}] Preparing ${fileName}...`
+        : "Initializing extraction...";
+    extractStatsBytes.textContent = "0 B / 0 B";
+    extractCurrentFile.textContent = total > 1 ? `[${idx + 1}/${total}] ${fileName}` : fileName;
+    addLogEntry(extractLogBox, `[${idx + 1}/${total}] Extracting "${fileName}" -> "${dest}"`);
+
+    hostBridge.postMessage({
+        action: "extract",
+        filePath,
+        destDir: dest,
+        mode: "all",
+        openWhenDone: total === 1
+    });
+}
+
+function finishBatchStep(succeeded, detailText, destDir) {
+    const q = batchExtractQueue;
+    if (!q) return false;
+
+    const total = q.files.length;
+    const idxNum = q.index + 1;
+    if (succeeded) {
+        q.successCount++;
+        if (destDir) q.lastDestDir = destDir;
+        addLogEntry(extractLogBox, `[${idxNum}/${total}] ✓ Extracted to: ${q.lastDestDir}`, "success");
+    } else {
+        q.failedCount++;
+        addLogEntry(extractLogBox, `[${idxNum}/${total}] ✕ Failed: ${detailText}`, "error");
+    }
+
+    q.index++;
+    if (q.index < total) {
+        dispatchNextBatchExtraction();
+        return true;
+    }
+
+    const totalTime = formatDuration(Math.max(0.1, (Date.now() - q.startTime) / 1000.0));
+    lastExtractedDest = q.lastDestDir;
+    const ok = q.successCount;
+    const fail = q.failedCount;
+    batchExtractQueue = null;
+
+    extractProgressBar.style.width = "100%";
+    extractModalPct.textContent = "100%";
+    if (fail === 0) {
+        extractCurrentFile.textContent = total === 1
+            ? `✓ Extraction completed in ${totalTime}!`
+            : `✓ Batch extraction complete (${ok}/${total}) in ${totalTime}!`;
+        extractStatsFiles.textContent = total === 1
+            ? `Extracted all files • Took ${totalTime}`
+            : `Extracted ${ok} package container(s) • Took ${totalTime}`;
+        addLogEntry(extractLogBox, `✓ Completed ${ok}/${total} container(s) in ${totalTime}.`, "success");
+        completeOrbTask("extract");
+        showToast(total === 1 ? `Extraction finished in ${totalTime}!` : `Batch finished (${ok}/${total}) in ${totalTime}!`);
+    } else {
+        extractCurrentFile.textContent = `✕ Completed with ${fail} error(s) (${ok}/${total} succeeded)`;
+        extractStatsFiles.textContent = `Finished with errors • Took ${totalTime}`;
+        completeOrbTask("extract");
+        resetOrbTask();
+        showToast(`Completed (${ok}/${total} succeeded, ${fail} failed)`);
+    }
+
+    if (ok > 0) {
+        btnModalOpenFolder.style.display = "inline-flex";
+    }
+    btnModalClose.style.display = "inline-flex";
+    return true;
+}
+
 // Extraction Execution
 async function startExtraction() {
     if (!currentContainer) {
@@ -1325,7 +1510,7 @@ async function executeExtraction(nupPath, dest, mode, openWhenDone) {
     }
 
     if (isNative) {
-        window.chrome.webview.postMessage(payload);
+        hostBridge.postMessage(payload);
     } else {
         try {
             const res = await fetch("/api/extract", {
@@ -1384,19 +1569,29 @@ function onExtractProgress(info) {
     extractSmoothedEta = etaResult.smoothedEta;
 
     const etaSuffix = etaResult.etaStr ? ` • ~${etaResult.etaStr} remaining` : "";
+    const batchPrefix = batchExtractQueue
+        ? `[${batchExtractQueue.index + 1}/${batchExtractQueue.files.length}] `
+        : "";
 
     extractProgressBar.style.width = `${clampedPct}%`;
     extractModalPct.textContent = `${clampedPct}%`;
-    extractStatsFiles.textContent = `Extracted ${current} of ${total} files${etaSuffix}`;
+    extractStatsFiles.textContent = `${batchPrefix}Extracted ${current} of ${total} files${etaSuffix}`;
     extractStatsBytes.textContent = `${formatBytes(bytesWritten)} / ${formatBytes(totalBytes)}`;
     extractCurrentFile.textContent = fileName;
 
     if (fileName && fileName !== "Initializing extraction..." && fileName !== "Done") {
         addLogEntry(extractLogBox, `[OK] ${fileName} (${formatBytes(fileSize)})`);
     }
+
+    updateOrbTaskProgress("extract", clampedPct);
 }
 
 function onExtractDone(msg) {
+    const dest = (msg && (msg.destDir || msg.dest_dir || msg.DestDir)) || lastExtractedDest || "Destination";
+    if (finishBatchStep(true, "", dest)) {
+        return;
+    }
+
     const elapsedSec = (msg && typeof msg.elapsedSeconds === "number" && msg.elapsedSeconds > 0)
         ? msg.elapsedSeconds
         : (extractStartTime ? Math.max(0.1, (Date.now() - extractStartTime) / 1000.0) : 0);
@@ -1406,18 +1601,23 @@ function onExtractDone(msg) {
     extractModalPct.textContent = "100%";
     extractCurrentFile.textContent = `✓ Extraction completed in ${timeSpent}!`;
     extractStatsFiles.textContent = `Extracted all files • Took ${timeSpent}`;
-    const dest = (msg && (msg.destDir || msg.dest_dir || msg.DestDir)) || lastExtractedDest || "Destination";
     addLogEntry(extractLogBox, `✓ Completed in ${timeSpent}. All files extracted to: ${dest}`, "success");
     btnModalOpenFolder.style.display = "inline-flex";
     btnModalClose.style.display = "inline-flex";
+    completeOrbTask("extract");
     showToast(`Extraction finished in ${timeSpent}!`);
 }
 
 function onExtractError(msg) {
     const errText = (msg && (msg.error || msg.Error)) || (msg && msg.info && (msg.info.error || msg.info.Error)) || "Unknown extraction error";
+    if (finishBatchStep(false, errText, "")) {
+        return;
+    }
+
     extractCurrentFile.textContent = `✕ Extraction error: ${errText}`;
     addLogEntry(extractLogBox, `[ERROR] ${errText}`, "error");
     btnModalClose.style.display = "inline-flex";
+    resetOrbTask();
 }
 
 // Verification Execution
@@ -1433,7 +1633,7 @@ async function startVerification() {
     const filePath = currentContainer.file_path || currentContainer.filePath;
 
     if (isNative) {
-        window.chrome.webview.postMessage({
+        hostBridge.postMessage({
             action: "verify",
             filePath: filePath,
             deep: true
@@ -1477,6 +1677,7 @@ function onVerifyProgress(info) {
     verifyProgressBar.style.width = `${clampedPct}%`;
     verifyModalPct.textContent = `${clampedPct}%`;
     verifyStatusText.textContent = `Verifying: ${fileName} (${current} / ${total})`;
+    updateOrbTaskProgress("verify", clampedPct);
 }
 
 function onVerifyDone(info) {
@@ -1496,11 +1697,13 @@ function onVerifyDone(info) {
             addLogEntry(verifyResultBox, `✓ TOC SHA-256 hash (${tocHash.slice(0, 16)}...): PASS`, "success");
         }
         addLogEntry(verifyResultBox, `✓ All ${totalChecked} files SHA-256 integrity: PASS`, "success");
+        completeOrbTask("verify");
     } else {
         verifyStatusText.textContent = "✕ Integrity problems found:";
         problems.forEach(p => {
             addLogEntry(verifyResultBox, `[PROBLEM] ${p}`, "error");
         });
+        resetOrbTask();
     }
 }
 
@@ -1508,6 +1711,7 @@ function onVerifyError(msg) {
     const errText = (msg && (msg.error || msg.Error)) || "Verification error";
     verifyStatusText.textContent = `Verification error: ${errText}`;
     addLogEntry(verifyResultBox, `Error: ${errText}`, "error");
+    resetOrbTask();
 }
 
 function addLogEntry(box, text, type = "") {
@@ -1758,7 +1962,8 @@ if (btnUpdateNow) {
         btnUpdateCancel.textContent = "Cancel";
 
         nativeCall("start_update", {
-            downloadUrl: pendingUpdateData.downloadUrl
+            downloadUrl: pendingUpdateData.downloadUrl,
+            checksumUrl: pendingUpdateData.checksumUrl || null
         }).catch(err => {
             onUpdateError({ error: err.message });
         });
@@ -1794,7 +1999,10 @@ if (isNative) {
         if (res && res.version && appVersionBadge) {
             appVersionBadge.textContent = "v" + res.version;
         }
-        if (res && res.initialFilePath) {
+        if (res && Array.isArray(res.autoExtractFiles) && res.autoExtractFiles.length > 0) {
+            switchAppMode("extract");
+            startBatchExtraction(res.autoExtractFiles);
+        } else if (res && res.initialFilePath) {
             loadNup(res.initialFilePath);
         }
     }).catch(() => {});
@@ -1804,3 +2012,508 @@ if (isNative) {
         checkForUpdates(false);
     }, 2000);
 }
+
+// ==========================================
+// Floating Orb & Liquid Glass Controller
+// ==========================================
+
+const ORB_DRAG_THRESHOLD_PX = 4;
+const ORB_RING_CIRCUMFERENCE = 2 * Math.PI * 28; // r = 28 -> 175.93
+
+const orbButton = document.getElementById("orb-button");
+const orbAppIcon = document.getElementById("orb-app-icon");
+const orbIconFallback = document.getElementById("orb-icon-fallback");
+const orbRingFill = document.getElementById("orb-ring-fill");
+const appHeader = document.getElementById("app-header");
+const appScrollViewport = document.getElementById("app-scroll-viewport");
+const btnWinMinimize = document.getElementById("btn-win-minimize");
+const btnWinMaximize = document.getElementById("btn-win-maximize");
+const btnWinClose = document.getElementById("btn-win-close");
+const btnOrbSettings = document.getElementById("btn-orb-settings");
+const btnExtractCollapseBg = document.getElementById("btn-extract-collapse-bg");
+
+const orbSettingsModal = document.getElementById("orb-settings-modal");
+const btnCloseOrbSettings = document.getElementById("btn-close-orb-settings");
+const statusBackdropText = document.getElementById("status-backdrop-text");
+const statusMotionText = document.getElementById("status-motion-text");
+
+let currentOrbWindowState = document.body.classList.contains("mode-collapsed") ? "collapsed" : "expanded";
+let savedTreeScrollTop = 0;
+let savedViewportScrollTop = 0;
+let orbIdleTimer = null;
+let orbCompleteClearTimer = null;
+let orbTaskActive = false;
+
+let orbPointerState = {
+    active: false,
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    dragging: false
+};
+
+function postNativeAction(action, payload = {}) {
+    if (isNative) {
+        hostBridge.postMessage({ action, ...payload });
+    }
+}
+
+function requestOrbExpand() {
+    clearOrbIdle();
+    if (isNative) {
+        postNativeAction("orb_expand");
+    } else {
+        onMorphFrame({ state: "expanded", progress: 1, radiusPx: 28, expandedWidth: window.innerWidth, expandedHeight: window.innerHeight });
+    }
+}
+
+function requestOrbCollapse() {
+    captureScrollPositions();
+    hideContextMenu();
+    if (isNative) {
+        postNativeAction("orb_collapse");
+    } else {
+        onMorphFrame({ state: "collapsed", progress: 0, radiusPx: 32, expandedWidth: 1240, expandedHeight: 820 });
+    }
+}
+
+function captureScrollPositions() {
+    if (treeViewEl) savedTreeScrollTop = treeViewEl.scrollTop;
+    if (appScrollViewport) savedViewportScrollTop = appScrollViewport.scrollTop;
+}
+
+function restoreScrollPositions() {
+    if (treeViewEl && savedTreeScrollTop > 0) treeViewEl.scrollTop = savedTreeScrollTop;
+    if (appScrollViewport && savedViewportScrollTop > 0) appScrollViewport.scrollTop = savedViewportScrollTop;
+}
+
+function onMorphFrame(msg) {
+    if (!msg) return;
+    const state = msg.state || "collapsed";
+    const progress = typeof msg.progress === "number" ? Math.min(1, Math.max(0, msg.progress)) : 0;
+    const radiusPx = typeof msg.radiusPx === "number" ? msg.radiusPx : (state === "collapsed" ? 32 : 28);
+    const rootStyle = document.documentElement.style;
+
+    const orbOpacity = Math.max(0, Math.min(1, 1 - (progress / 0.35)));
+    const orbScale = 1 + (progress * 0.22);
+    const appOpacity = Math.max(0, Math.min(1, (progress - 0.04) / 0.52));
+    const appScale = 0.92 + (0.08 * progress);
+
+    rootStyle.setProperty("--morph-t", String(progress));
+    rootStyle.setProperty("--orb-opacity", orbOpacity.toFixed(3));
+    rootStyle.setProperty("--orb-scale", orbScale.toFixed(4));
+    rootStyle.setProperty("--app-opacity", appOpacity.toFixed(3));
+    rootStyle.setProperty("--app-scale", appScale.toFixed(4));
+    rootStyle.setProperty("--shell-radius", state === "collapsed" ? "50%" : `${radiusPx}px`);
+
+    if (typeof msg.shellX === "number") {
+        rootStyle.setProperty("--shell-x", `${msg.shellX}px`);
+    }
+    if (typeof msg.shellY === "number") {
+        rootStyle.setProperty("--shell-y", `${msg.shellY}px`);
+    }
+    if (typeof msg.orbRelX === "number") {
+        rootStyle.setProperty("--orb-rel-x", `${msg.orbRelX}px`);
+        rootStyle.setProperty("--orb-origin-x", `${msg.orbRelX + 32}px`);
+    }
+    if (typeof msg.orbRelY === "number") {
+        rootStyle.setProperty("--orb-rel-y", `${msg.orbRelY}px`);
+        rootStyle.setProperty("--orb-origin-y", `${msg.orbRelY + 32}px`);
+    }
+    if (typeof msg.width === "number" && msg.width > 0) {
+        rootStyle.setProperty("--shell-w", `${msg.width}px`);
+    }
+    if (typeof msg.height === "number" && msg.height > 0) {
+        rootStyle.setProperty("--shell-h", `${msg.height}px`);
+    }
+    if (typeof msg.expandedWidth === "number" && msg.expandedWidth > 200) {
+        rootStyle.setProperty("--expanded-w", `${msg.expandedWidth}px`);
+    }
+    if (typeof msg.expandedHeight === "number" && msg.expandedHeight > 200) {
+        rootStyle.setProperty("--expanded-h", `${msg.expandedHeight}px`);
+    }
+
+    const prevState = currentOrbWindowState;
+    currentOrbWindowState = state;
+
+    if (prevState === "expanded" && state === "collapsing") {
+        captureScrollPositions();
+    }
+
+    document.body.classList.remove("mode-collapsed", "mode-morphing", "mode-expanding", "mode-collapsing", "mode-expanded");
+    if (state === "collapsed") {
+        document.body.classList.add("mode-collapsed");
+        scheduleOrbIdle();
+    } else if (state === "expanded") {
+        document.body.classList.add("mode-expanded");
+        clearOrbIdle();
+        clearOrbCompleteSoon(400);
+        requestAnimationFrame(restoreScrollPositions);
+    } else if (state === "collapsing") {
+        document.body.classList.add("mode-morphing", "mode-collapsing");
+        clearOrbIdle();
+    } else {
+        document.body.classList.add("mode-morphing", "mode-expanding");
+        clearOrbIdle();
+    }
+}
+
+function onSystemAppearance(msg) {
+    if (!msg) return;
+    const reduced = !!msg.reducedMotion;
+    const highContrast = !!msg.highContrast;
+    const transparency = msg.transparencyEnabled !== false;
+
+    document.body.classList.toggle("reduced-motion", reduced);
+    document.body.classList.toggle("high-contrast", highContrast);
+    document.body.classList.toggle("solid-fallback", !transparency || highContrast);
+
+    if (msg.theme) {
+        applyThemeClass(msg.theme);
+    }
+
+    if (statusBackdropText) {
+        statusBackdropText.textContent = highContrast
+            ? "Backdrop: High-Contrast Solid"
+            : (transparency ? "Backdrop: Windows Acrylic Glass" : "Backdrop: Solid Fallback");
+    }
+    if (statusMotionText) {
+        statusMotionText.textContent = reduced ? "Motion: Reduced (Quick Fade)" : "Motion: Spring Morph (400ms)";
+    }
+}
+
+function applyThemeClass(theme) {
+    const isLight = theme === "light";
+    document.body.classList.toggle("theme-light", isLight);
+    document.querySelectorAll("input[name='orb-theme']").forEach(r => {
+        r.checked = (r.value === (isLight ? "light" : "dark"));
+    });
+}
+
+function scheduleOrbIdle() {
+    clearTimeout(orbIdleTimer);
+    if (!orbButton || orbTaskActive || currentOrbWindowState !== "collapsed") return;
+    orbIdleTimer = setTimeout(() => {
+        if (orbButton && !orbTaskActive && currentOrbWindowState === "collapsed" &&
+            !orbButton.matches(":hover") && document.activeElement !== orbButton && !orbPointerState.active) {
+            orbButton.classList.add("orb-idle");
+        }
+    }, 2400);
+}
+
+function clearOrbIdle() {
+    clearTimeout(orbIdleTimer);
+    if (orbButton) orbButton.classList.remove("orb-idle");
+}
+
+function updateOrbTaskProgress(taskType, percent) {
+    orbTaskActive = true;
+    clearOrbIdle();
+    clearTimeout(orbCompleteClearTimer);
+
+    const pct = Math.min(100, Math.max(0, Number(percent) || 0));
+    if (orbButton) {
+        orbButton.classList.remove("task-complete");
+        orbButton.classList.add("task-running");
+        orbButton.classList.toggle("task-verify", taskType === "verify");
+        orbButton.setAttribute("aria-label", `NUP Extractor — ${taskType} ${Math.round(pct)}%`);
+    }
+    if (orbRingFill) {
+        const offset = ORB_RING_CIRCUMFERENCE * (1 - (pct / 100));
+        orbRingFill.style.strokeDashoffset = offset.toFixed(2);
+    }
+}
+
+function completeOrbTask(taskType) {
+    orbTaskActive = false;
+    clearOrbIdle();
+
+    if (orbButton) {
+        orbButton.classList.remove("task-running", "task-verify");
+        // Re-trigger pulse animation cleanly
+        orbButton.classList.remove("task-complete");
+        void orbButton.offsetWidth;
+        orbButton.classList.add("task-complete");
+        orbButton.setAttribute("aria-label", `Expand NUP Extractor (${taskType} complete)`);
+    }
+    if (orbRingFill) {
+        orbRingFill.style.strokeDashoffset = "0";
+    }
+
+    clearOrbCompleteSoon(6500);
+}
+
+function clearOrbCompleteSoon(delayMs) {
+    clearTimeout(orbCompleteClearTimer);
+    orbCompleteClearTimer = setTimeout(() => {
+        if (orbButton) {
+            orbButton.classList.remove("task-complete");
+            orbButton.setAttribute("aria-label", "Expand NUP Extractor");
+        }
+        if (orbRingFill) {
+            orbRingFill.style.strokeDashoffset = ORB_RING_CIRCUMFERENCE.toFixed(2);
+        }
+        if (currentOrbWindowState === "collapsed") {
+            scheduleOrbIdle();
+        }
+    }, delayMs);
+}
+
+function resetOrbTask() {
+    orbTaskActive = false;
+    clearTimeout(orbCompleteClearTimer);
+    if (orbButton) {
+        orbButton.classList.remove("task-running", "task-verify", "task-complete");
+        orbButton.setAttribute("aria-label", "Expand NUP Extractor");
+    }
+    if (orbRingFill) {
+        orbRingFill.style.strokeDashoffset = ORB_RING_CIRCUMFERENCE.toFixed(2);
+    }
+    if (currentOrbWindowState === "collapsed") {
+        scheduleOrbIdle();
+    }
+}
+
+function initFloatingOrbUi() {
+    // Non-native browser preview defaults to expanded
+    if (!isNative) {
+        document.body.classList.remove("mode-collapsed");
+        document.body.classList.add("mode-expanded");
+        document.documentElement.style.setProperty("--shell-radius", "28px");
+    }
+
+    // Fallback icon if app_icon.ico is missing in dev preview
+    if (orbAppIcon) {
+        orbAppIcon.addEventListener("error", () => {
+            orbAppIcon.style.display = "none";
+            if (orbIconFallback) orbIconFallback.style.display = "flex";
+        });
+    }
+
+    // Allow interrupting a mid-flight collapse by clicking anywhere on the morphing glass shell
+    const liquidShell = document.getElementById("liquid-shell");
+    if (liquidShell) {
+        liquidShell.addEventListener("pointerdown", (e) => {
+            if (e.button !== 0) return;
+            if (currentOrbWindowState === "collapsing") {
+                e.preventDefault();
+                requestOrbExpand();
+            }
+        });
+    }
+
+    // Orb pointer interaction: 4px threshold separates click (expand) from drag (move + edge snap)
+    if (orbButton) {
+        orbButton.addEventListener("pointerenter", () => clearOrbIdle());
+        orbButton.addEventListener("pointerleave", () => {
+            if (!orbPointerState.active) scheduleOrbIdle();
+        });
+        orbButton.addEventListener("focus", () => clearOrbIdle());
+        orbButton.addEventListener("blur", () => scheduleOrbIdle());
+
+        orbButton.addEventListener("pointerdown", (e) => {
+            if (e.button !== 0 || currentOrbWindowState !== "collapsed") return;
+            clearOrbIdle();
+            orbPointerState = {
+                active: true,
+                pointerId: e.pointerId,
+                startX: e.screenX,
+                startY: e.screenY,
+                dragging: false
+            };
+            try { orbButton.setPointerCapture(e.pointerId); } catch (_) {}
+        });
+
+        orbButton.addEventListener("pointermove", (e) => {
+            if (!orbPointerState.active || e.pointerId !== orbPointerState.pointerId) return;
+
+            if (!orbPointerState.dragging) {
+                const dx = e.screenX - orbPointerState.startX;
+                const dy = e.screenY - orbPointerState.startY;
+                if (Math.hypot(dx, dy) >= ORB_DRAG_THRESHOLD_PX) {
+                    orbPointerState.dragging = true;
+                    orbButton.classList.add("dragging");
+                    postNativeAction("orb_drag_start");
+                }
+            }
+
+            if (orbPointerState.dragging) {
+                postNativeAction("orb_drag_move");
+            }
+        });
+
+        const finishOrbPointer = (e, cancelled) => {
+            if (!orbPointerState.active || e.pointerId !== orbPointerState.pointerId) return;
+            const wasDragging = orbPointerState.dragging;
+            orbPointerState.active = false;
+            orbPointerState.dragging = false;
+            orbButton.classList.remove("dragging");
+            try { orbButton.releasePointerCapture(e.pointerId); } catch (_) {}
+
+            if (wasDragging) {
+                postNativeAction("orb_drag_end");
+            } else if (!cancelled) {
+                requestOrbExpand();
+            }
+        };
+
+        orbButton.addEventListener("pointerup", (e) => finishOrbPointer(e, false));
+        orbButton.addEventListener("pointercancel", (e) => finishOrbPointer(e, true));
+
+        // Keyboard accessibility: Enter / Space expands orb
+        orbButton.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                requestOrbExpand();
+            }
+        });
+
+        // Drag-and-drop .nup file directly onto collapsed orb -> expands & loads file
+        orbButton.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            clearOrbIdle();
+            orbButton.classList.add("dragover");
+        });
+        orbButton.addEventListener("dragleave", () => {
+            orbButton.classList.remove("dragover");
+            scheduleOrbIdle();
+        });
+        orbButton.addEventListener("drop", (e) => {
+            e.preventDefault();
+            orbButton.classList.remove("dragover");
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                if (isNative && hostBridge.postMessageWithFiles(
+                    { action: "orb_file_drop", target: "orb" },
+                    e.dataTransfer.files
+                )) {
+                    return;
+                } else {
+                    const file = e.dataTransfer.files[0];
+                    requestOrbExpand();
+                    if (file && file.path) loadNup(file.path);
+                }
+            }
+        });
+    }
+
+    // Expanded Header Native Window Dragging & Double-Click Maximize
+    if (appHeader) {
+        appHeader.addEventListener("mousedown", (e) => {
+            if (e.button !== 0) return;
+            if (e.target.closest("button, input, select, a, .badge-version-pill, .nav-mode-selector")) return;
+            postNativeAction("window_drag_start");
+        });
+        appHeader.addEventListener("dblclick", (e) => {
+            if (e.target.closest("button, input, select, a, .badge-version-pill, .nav-mode-selector")) return;
+            postNativeAction("window_toggle_maximize");
+        });
+    }
+
+    // Header Window Controls
+    if (btnWinMinimize) {
+        btnWinMinimize.addEventListener("click", () => requestOrbCollapse());
+    }
+    if (btnWinMaximize) {
+        btnWinMaximize.addEventListener("click", () => postNativeAction("window_toggle_maximize"));
+    }
+    if (btnWinClose) {
+        btnWinClose.addEventListener("click", () => postNativeAction("window_close"));
+    }
+    if (btnExtractCollapseBg) {
+        btnExtractCollapseBg.addEventListener("click", () => requestOrbCollapse());
+    }
+
+    // Orb & Liquid Glass Settings Modal
+    if (btnOrbSettings && orbSettingsModal) {
+        btnOrbSettings.addEventListener("click", () => {
+            orbSettingsModal.classList.add("active");
+            loadOrbSettingsIntoModal();
+        });
+    }
+    if (btnCloseOrbSettings && orbSettingsModal) {
+        btnCloseOrbSettings.addEventListener("click", () => {
+            orbSettingsModal.classList.remove("active");
+        });
+    }
+    document.querySelectorAll("input[name='orb-launch-mode']").forEach(radio => {
+        radio.addEventListener("change", (e) => {
+            if (isNative) {
+                nativeCall("update_orb_settings", { launchMode: e.target.value })
+                    .then(() => showToast("Launch mode saved"))
+                    .catch(() => {});
+            }
+        });
+    });
+    document.querySelectorAll("input[name='orb-theme']").forEach(radio => {
+        radio.addEventListener("change", (e) => {
+            applyThemeClass(e.target.value);
+            if (isNative) {
+                nativeCall("update_orb_settings", { theme: e.target.value })
+                    .then(() => showToast(`Switched to ${e.target.value === "light" ? "Light" : "Dark"} Liquid Glass`))
+                    .catch(() => {});
+            }
+        });
+    });
+
+    // Global Escape Key: close open modal/menu first; otherwise collapse window back to orb
+    document.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return;
+        if (currentOrbWindowState !== "expanded" && currentOrbWindowState !== "expanding") return;
+
+        if (fileContextMenu && fileContextMenu.classList.contains("show")) {
+            hideContextMenu();
+            return;
+        }
+        const dismissibleModals = [
+            orbSettingsModal,
+            shellSettingsModal,
+            updateModal,
+            diskSpaceModal,
+            verifyModal
+        ];
+        for (const modal of dismissibleModals) {
+            if (modal && modal.classList.contains("active")) {
+                modal.classList.remove("active");
+                return;
+            }
+        }
+        if (extractModal && extractModal.classList.contains("active") && btnModalClose && btnModalClose.style.display !== "none") {
+            extractModal.classList.remove("active");
+            return;
+        }
+        if (packModal && packModal.classList.contains("active") && btnPackModalClose && btnPackModalClose.style.display !== "none") {
+            packModal.classList.remove("active");
+            return;
+        }
+
+        e.preventDefault();
+        requestOrbCollapse();
+    });
+
+    // Load initial persisted settings from native host
+    if (isNative) {
+        loadOrbSettingsIntoModal();
+    }
+}
+
+function loadOrbSettingsIntoModal() {
+    if (!isNative) return;
+    nativeCall("get_orb_settings").then(res => {
+        if (!res) return;
+        const s = res.settings || res;
+        if (s.launchMode) {
+            document.querySelectorAll("input[name='orb-launch-mode']").forEach(r => {
+                r.checked = r.value.toLowerCase() === String(s.launchMode).toLowerCase();
+            });
+        }
+        if (s.theme) {
+            applyThemeClass(s.theme);
+        }
+        if (res.appearance) {
+            onSystemAppearance({ ...res.appearance, theme: s.theme });
+        }
+    }).catch(() => {});
+}
+
+document.addEventListener("DOMContentLoaded", initFloatingOrbUi);
+

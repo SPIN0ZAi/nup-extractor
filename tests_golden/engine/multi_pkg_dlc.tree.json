@@ -1,0 +1,179 @@
+{
+  "fixture": "multi_pkg_dlc",
+  "dirCount": 9,
+  "dirs": [
+    {
+      "type": "dir",
+      "index": 0,
+      "name": "root",
+      "children": [
+        {
+          "type": "dir",
+          "index": 1,
+          "name": "exefs",
+          "child_count": 1,
+          "childCount": 1,
+          "has_children": true,
+          "hasChildren": true
+        },
+        {
+          "type": "dir",
+          "index": 2,
+          "name": "romfs",
+          "child_count": 1,
+          "childCount": 1,
+          "has_children": true,
+          "hasChildren": true
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 1,
+      "name": "exefs",
+      "children": [
+        {
+          "type": "file",
+          "index": 0,
+          "name": "rtld",
+          "size": 17,
+          "size_formatted": "17 B",
+          "sizeFormatted": "17 B",
+          "extent_size": 17,
+          "extentSize": 17,
+          "extent_size_formatted": "17 B",
+          "extentSizeFormatted": "17 B",
+          "codec": "raw",
+          "sha256": "840c796beb12189ca241ff5d744ec58fc31864d19d6122a4bd20566a56777c75"
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 2,
+      "name": "romfs",
+      "children": [
+        {
+          "type": "dir",
+          "index": 3,
+          "name": "data",
+          "child_count": 1,
+          "childCount": 1,
+          "has_children": true,
+          "hasChildren": true
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 3,
+      "name": "data",
+      "children": [
+        {
+          "type": "file",
+          "index": 1,
+          "name": "world.json",
+          "size": 42,
+          "size_formatted": "42 B",
+          "sizeFormatted": "42 B",
+          "extent_size": 42,
+          "extentSize": 42,
+          "extent_size_formatted": "42 B",
+          "extentSizeFormatted": "42 B",
+          "codec": "raw",
+          "sha256": "3402cbd7ffd6d8c84948fd06cd4f2b24a066775519c881d71366263ba81121a0"
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 4,
+      "name": "root",
+      "children": [
+        {
+          "type": "dir",
+          "index": 5,
+          "name": "romfs",
+          "child_count": 1,
+          "childCount": 1,
+          "has_children": true,
+          "hasChildren": true
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 5,
+      "name": "romfs",
+      "children": [
+        {
+          "type": "dir",
+          "index": 6,
+          "name": "data",
+          "child_count": 1,
+          "childCount": 1,
+          "has_children": true,
+          "hasChildren": true
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 6,
+      "name": "data",
+      "children": [
+        {
+          "type": "file",
+          "index": 2,
+          "name": "patch.txt",
+          "size": 800,
+          "size_formatted": "800 B",
+          "sizeFormatted": "800 B",
+          "extent_size": 32,
+          "extentSize": 32,
+          "extent_size_formatted": "32 B",
+          "extentSizeFormatted": "32 B",
+          "codec": "zstd",
+          "sha256": "407a94cd2e5cfd26dc267b73d6c48e97e6fff800d984ab9c19d73c931f665a38"
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 7,
+      "name": "root",
+      "children": [
+        {
+          "type": "dir",
+          "index": 8,
+          "name": "romfs",
+          "child_count": 1,
+          "childCount": 1,
+          "has_children": true,
+          "hasChildren": true
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 8,
+      "name": "romfs",
+      "children": [
+        {
+          "type": "file",
+          "index": 3,
+          "name": "costume.bin",
+          "size": 23,
+          "size_formatted": "23 B",
+          "sizeFormatted": "23 B",
+          "extent_size": 23,
+          "extentSize": 23,
+          "extent_size_formatted": "23 B",
+          "extentSizeFormatted": "23 B",
+          "codec": "raw",
+          "sha256": "bae442202cd72b4095dea18312848c3a7cb09f6c418fcf9bfb31d17e26db868d"
+        }
+      ]
+    }
+  ]
+}

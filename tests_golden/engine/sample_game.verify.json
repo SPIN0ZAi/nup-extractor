@@ -1,0 +1,15 @@
+{
+  "fixture": "sample_game",
+  "fast": {
+    "deep": false,
+    "valid": true,
+    "totalFilesChecked": 5,
+    "problems": []
+  },
+  "deep": {
+    "deep": true,
+    "valid": true,
+    "totalFilesChecked": 5,
+    "problems": []
+  }
+}

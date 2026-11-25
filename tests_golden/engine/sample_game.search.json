@@ -1,0 +1,189 @@
+{
+  "fixture": "sample_game",
+  "queries": [
+    {
+      "query": "",
+      "results": [
+        {
+          "index": 0,
+          "name": "main",
+          "size": 2144,
+          "size_formatted": "2.09 KB",
+          "sizeFormatted": "2.09 KB",
+          "extent_size": 46,
+          "extentSize": 46,
+          "extent_size_formatted": "46 B",
+          "extentSizeFormatted": "46 B",
+          "codec": "zstd",
+          "sha256": "542ed0545aa69e38fe758245ed83161aa1a8b850101e8bf85b81613dea3eb385"
+        },
+        {
+          "index": 1,
+          "name": "config.json",
+          "size": 92,
+          "size_formatted": "92 B",
+          "sizeFormatted": "92 B",
+          "extent_size": 92,
+          "extentSize": 92,
+          "extent_size_formatted": "92 B",
+          "extentSizeFormatted": "92 B",
+          "codec": "raw",
+          "sha256": "1fe07b7c026d2b2d889b7dd7e7e762146c84bbf8248ddd6b1f513300170a2d8c"
+        },
+        {
+          "index": 2,
+          "name": "level01.dat",
+          "size": 8000,
+          "size_formatted": "7.81 KB",
+          "sizeFormatted": "7.81 KB",
+          "extent_size": 34,
+          "extentSize": 34,
+          "extent_size_formatted": "34 B",
+          "extentSizeFormatted": "34 B",
+          "codec": "zstd",
+          "sha256": "fb6f42a3929517c310d3ea0160c674030021d43990fa14af64663e7d3141bb67"
+        },
+        {
+          "index": 3,
+          "name": "ui_sheet.bin",
+          "size": 13000,
+          "size_formatted": "12.70 KB",
+          "sizeFormatted": "12.70 KB",
+          "extent_size": 31,
+          "extentSize": 31,
+          "extent_size_formatted": "31 B",
+          "extentSizeFormatted": "31 B",
+          "codec": "zstd",
+          "sha256": "9040964ebac98dac9dcd642fb1c7877494eea201092b81773ee04af14b48cf61"
+        },
+        {
+          "index": 4,
+          "name": "patch_notes.txt",
+          "size": 77,
+          "size_formatted": "77 B",
+          "sizeFormatted": "77 B",
+          "extent_size": 77,
+          "extentSize": 77,
+          "extent_size_formatted": "77 B",
+          "extentSizeFormatted": "77 B",
+          "codec": "raw",
+          "sha256": "4fea34bbcde01b98dd42cb00611e8c51b356ab361d14539a209a0415a6ebbcd4"
+        }
+      ]
+    },
+    {
+      "query": "a",
+      "results": [
+        {
+          "index": 0,
+          "name": "main",
+          "size": 2144,
+          "size_formatted": "2.09 KB",
+          "sizeFormatted": "2.09 KB",
+          "extent_size": 46,
+          "extentSize": 46,
+          "extent_size_formatted": "46 B",
+          "extentSizeFormatted": "46 B",
+          "codec": "zstd",
+          "sha256": "542ed0545aa69e38fe758245ed83161aa1a8b850101e8bf85b81613dea3eb385"
+        },
+        {
+          "index": 2,
+          "name": "level01.dat",
+          "size": 8000,
+          "size_formatted": "7.81 KB",
+          "sizeFormatted": "7.81 KB",
+          "extent_size": 34,
+          "extentSize": 34,
+          "extent_size_formatted": "34 B",
+          "extentSizeFormatted": "34 B",
+          "codec": "zstd",
+          "sha256": "fb6f42a3929517c310d3ea0160c674030021d43990fa14af64663e7d3141bb67"
+        },
+        {
+          "index": 4,
+          "name": "patch_notes.txt",
+          "size": 77,
+          "size_formatted": "77 B",
+          "sizeFormatted": "77 B",
+          "extent_size": 77,
+          "extentSize": 77,
+          "extent_size_formatted": "77 B",
+          "extentSizeFormatted": "77 B",
+          "codec": "raw",
+          "sha256": "4fea34bbcde01b98dd42cb00611e8c51b356ab361d14539a209a0415a6ebbcd4"
+        }
+      ]
+    },
+    {
+      "query": "LEVEL",
+      "results": [
+        {
+          "index": 2,
+          "name": "level01.dat",
+          "size": 8000,
+          "size_formatted": "7.81 KB",
+          "sizeFormatted": "7.81 KB",
+          "extent_size": 34,
+          "extentSize": 34,
+          "extent_size_formatted": "34 B",
+          "extentSizeFormatted": "34 B",
+          "codec": "zstd",
+          "sha256": "fb6f42a3929517c310d3ea0160c674030021d43990fa14af64663e7d3141bb67"
+        }
+      ]
+    },
+    {
+      "query": "level",
+      "results": [
+        {
+          "index": 2,
+          "name": "level01.dat",
+          "size": 8000,
+          "size_formatted": "7.81 KB",
+          "sizeFormatted": "7.81 KB",
+          "extent_size": 34,
+          "extentSize": 34,
+          "extent_size_formatted": "34 B",
+          "extentSizeFormatted": "34 B",
+          "codec": "zstd",
+          "sha256": "fb6f42a3929517c310d3ea0160c674030021d43990fa14af64663e7d3141bb67"
+        }
+      ]
+    },
+    {
+      "query": "\u65E5",
+      "results": []
+    },
+    {
+      "query": "caf\u00E9",
+      "results": []
+    },
+    {
+      "query": ".npdm",
+      "results": []
+    },
+    {
+      "query": "nonexistent_xyz",
+      "results": []
+    },
+    {
+      "query": "0",
+      "results": [
+        {
+          "index": 2,
+          "name": "level01.dat",
+          "size": 8000,
+          "size_formatted": "7.81 KB",
+          "sizeFormatted": "7.81 KB",
+          "extent_size": 34,
+          "extentSize": 34,
+          "extent_size_formatted": "34 B",
+          "extentSizeFormatted": "34 B",
+          "codec": "zstd",
+          "sha256": "fb6f42a3929517c310d3ea0160c674030021d43990fa14af64663e7d3141bb67"
+        }
+      ]
+    }
+  ]
+}

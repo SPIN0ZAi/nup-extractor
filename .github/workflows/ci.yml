@@ -20,28 +20,38 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Setup .NET SDK
+    - name: Setup Rust Toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+
+    - name: Rust Cargo Cache
+      uses: Swatinem/rust-cache@v2
+
+    - name: Setup .NET SDK (Legacy Parity Suite)
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '10.0.x'
 
-    - name: Restore Dependencies
-      run: dotnet restore NupExtractor.slnx
+    - name: Check Formatting
+      run: cargo fmt --all -- --check
 
-    - name: Compile Solution (Release Mode)
-      run: dotnet build NupExtractor.slnx -c Release --no-restore
+    - name: Run Clippy Lints
+      run: cargo clippy --workspace --all-targets -- -D warnings
 
-    - name: Execute Automated Unit Tests (xUnit)
-      run: dotnet test NupExtractor.slnx -c Release --no-build --verbosity normal
+    - name: Run Automated Test Suite
+      run: cargo test --workspace
+
+    - name: Run Legacy .NET Parity Tests
+      run: dotnet test legacy_dotnet/NupExtractor.slnx -c Release --verbosity normal
+
+    - name: Build Standalone Release Executable
+      run: cargo build --release -p nup-extractor
 
     - name: Verify Standalone Executable Packaging
+      shell: pwsh
       run: |
-        dotnet publish src_native/NupExtractorApp.csproj `
-          -c Release `
-          -r win-x64 `
-          --self-contained `
-          -p:PublishSingleFile=true `
-          -p:IncludeNativeLibrariesForSelfExtract=true `
-          -p:EnableCompressionInSingleFile=false `
-          -o dist_verify
+        New-Item -ItemType Directory -Force dist_verify
+        Copy-Item target/release/NUP_Extractor.exe dist_verify/NUP_Extractor.exe
+        Get-Item dist_verify/NUP_Extractor.exe
 

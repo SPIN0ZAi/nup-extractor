@@ -19,7 +19,15 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Setup .NET SDK
+    - name: Setup Rust Toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+
+    - name: Rust Cargo Cache
+      uses: Swatinem/rust-cache@v2
+
+    - name: Setup .NET SDK (Legacy Parity Suite)
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '10.0.x'
@@ -71,41 +79,47 @@ jobs:
         "RELEASE_VERSION=$rawVer" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
         "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
-    - name: Restore Dependencies
-      run: dotnet restore NupExtractor.slnx
-
-    - name: Run Automated Test Suite (19 Tests)
-      run: dotnet test NupExtractor.slnx -c Release --no-restore --verbosity normal
-
-    - name: Publish Standalone Executable
+    - name: Check Formatting & Clippy
       run: |
-        dotnet publish src_native/NupExtractorApp.csproj `
-          -c Release `
-          -r win-x64 `
-          --self-contained `
-          -p:PublishSingleFile=true `
-          -p:IncludeNativeLibrariesForSelfExtract=true `
-          -p:EnableCompressionInSingleFile=false `
-          -p:Version=${{ env.RELEASE_VERSION }} `
-          -p:AssemblyVersion=${{ env.RELEASE_VERSION }}.0 `
-          -p:FileVersion=${{ env.RELEASE_VERSION }}.0 `
-          -p:InformationalVersion=${{ env.RELEASE_VERSION }} `
-          -o dist_release
+        cargo fmt --all -- --check
+        cargo clippy --workspace --all-targets -- -D warnings
+
+    - name: Run Automated Test Suite
+      env:
+        NUP_RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
+      run: |
+        cargo test --workspace
+        dotnet test legacy_dotnet/NupExtractor.slnx -c Release --verbosity normal
+
+    - name: Build Standalone Release Executable
+      env:
+        NUP_RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
+      run: cargo build --release -p nup-extractor
 
     - name: Package Release Assets
       shell: pwsh
       run: |
-        New-Item -ItemType Directory -Force release_assets
-        Copy-Item dist_release/NupExtractorApp.exe release_assets/NUP_Extractor.exe
-        Copy-Item README.md release_assets/
-        Copy-Item LICENSE release_assets/
-        Compress-Archive -Path release_assets/* -DestinationPath release_assets/NUP_Extractor-windows-x64.zip
-        
-        # Generate SHA256 checksums for both standalone exe and zip bundle
-        $hashZip = Get-FileHash release_assets/NUP_Extractor-windows-x64.zip -Algorithm SHA256
-        $hashExe = Get-FileHash release_assets/NUP_Extractor.exe -Algorithm SHA256
-        @("$($hashExe.Hash)  NUP_Extractor.exe", "$($hashZip.Hash)  NUP_Extractor-windows-x64.zip") | Out-File -Encoding utf8 release_assets/SHA256SUMS.txt
+        $bundleDir = Join-Path (Get-Location) "release_bundle"
+        New-Item -ItemType Directory -Force $bundleDir | Out-Null
+        Copy-Item target/release/NUP_Extractor.exe "$bundleDir/NUP_Extractor.exe"
+        Copy-Item README.md "$bundleDir/"
+        Copy-Item LICENSE "$bundleDir/"
+
+        New-Item -ItemType Directory -Force release_assets | Out-Null
+        Copy-Item target/release/NUP_Extractor.exe release_assets/NUP_Extractor.exe
+        Compress-Archive -Path "$bundleDir/*" -DestinationPath release_assets/NUP_Extractor-windows-x64.zip -Force
+
+        # Generate BOM-free lowercase SHA256 checksums for both standalone exe and zip bundle
+        $hashZip = (Get-FileHash release_assets/NUP_Extractor-windows-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+        $hashExe = (Get-FileHash release_assets/NUP_Extractor.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+        $sumLines = @(
+            "$hashExe  NUP_Extractor.exe",
+            "$hashZip  NUP_Extractor-windows-x64.zip"
+        )
+        $sumPath = Join-Path (Get-Location) "release_assets/SHA256SUMS.txt"
+        [System.IO.File]::WriteAllLines($sumPath, $sumLines, [System.Text.UTF8Encoding]::new($false))
         Write-Host "Generated SHA-256 Checksums"
+        Get-Content $sumPath
 
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4

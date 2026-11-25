@@ -1,0 +1,202 @@
+{
+  "fixture": "sample_game",
+  "dirCount": 9,
+  "dirs": [
+    {
+      "type": "dir",
+      "index": 0,
+      "name": "root",
+      "children": [
+        {
+          "type": "dir",
+          "index": 1,
+          "name": "exefs",
+          "child_count": 1,
+          "childCount": 1,
+          "has_children": true,
+          "hasChildren": true
+        },
+        {
+          "type": "dir",
+          "index": 2,
+          "name": "romfs",
+          "child_count": 2,
+          "childCount": 2,
+          "has_children": true,
+          "hasChildren": true
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 1,
+      "name": "exefs",
+      "children": [
+        {
+          "type": "file",
+          "index": 0,
+          "name": "main",
+          "size": 2144,
+          "size_formatted": "2.09 KB",
+          "sizeFormatted": "2.09 KB",
+          "extent_size": 46,
+          "extentSize": 46,
+          "extent_size_formatted": "46 B",
+          "extentSizeFormatted": "46 B",
+          "codec": "zstd",
+          "sha256": "542ed0545aa69e38fe758245ed83161aa1a8b850101e8bf85b81613dea3eb385"
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 2,
+      "name": "romfs",
+      "children": [
+        {
+          "type": "dir",
+          "index": 3,
+          "name": "data",
+          "child_count": 2,
+          "childCount": 2,
+          "has_children": true,
+          "hasChildren": true
+        },
+        {
+          "type": "dir",
+          "index": 5,
+          "name": "textures",
+          "child_count": 1,
+          "childCount": 1,
+          "has_children": true,
+          "hasChildren": true
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 3,
+      "name": "data",
+      "children": [
+        {
+          "type": "file",
+          "index": 1,
+          "name": "config.json",
+          "size": 92,
+          "size_formatted": "92 B",
+          "sizeFormatted": "92 B",
+          "extent_size": 92,
+          "extentSize": 92,
+          "extent_size_formatted": "92 B",
+          "extentSizeFormatted": "92 B",
+          "codec": "raw",
+          "sha256": "1fe07b7c026d2b2d889b7dd7e7e762146c84bbf8248ddd6b1f513300170a2d8c"
+        },
+        {
+          "type": "dir",
+          "index": 4,
+          "name": "levels",
+          "child_count": 1,
+          "childCount": 1,
+          "has_children": true,
+          "hasChildren": true
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 4,
+      "name": "levels",
+      "children": [
+        {
+          "type": "file",
+          "index": 2,
+          "name": "level01.dat",
+          "size": 8000,
+          "size_formatted": "7.81 KB",
+          "sizeFormatted": "7.81 KB",
+          "extent_size": 34,
+          "extentSize": 34,
+          "extent_size_formatted": "34 B",
+          "extentSizeFormatted": "34 B",
+          "codec": "zstd",
+          "sha256": "fb6f42a3929517c310d3ea0160c674030021d43990fa14af64663e7d3141bb67"
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 5,
+      "name": "textures",
+      "children": [
+        {
+          "type": "file",
+          "index": 3,
+          "name": "ui_sheet.bin",
+          "size": 13000,
+          "size_formatted": "12.70 KB",
+          "sizeFormatted": "12.70 KB",
+          "extent_size": 31,
+          "extentSize": 31,
+          "extent_size_formatted": "31 B",
+          "extentSizeFormatted": "31 B",
+          "codec": "zstd",
+          "sha256": "9040964ebac98dac9dcd642fb1c7877494eea201092b81773ee04af14b48cf61"
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 6,
+      "name": "root",
+      "children": [
+        {
+          "type": "dir",
+          "index": 7,
+          "name": "romfs",
+          "child_count": 1,
+          "childCount": 1,
+          "has_children": true,
+          "hasChildren": true
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 7,
+      "name": "romfs",
+      "children": [
+        {
+          "type": "dir",
+          "index": 8,
+          "name": "data",
+          "child_count": 1,
+          "childCount": 1,
+          "has_children": true,
+          "hasChildren": true
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 8,
+      "name": "data",
+      "children": [
+        {
+          "type": "file",
+          "index": 4,
+          "name": "patch_notes.txt",
+          "size": 77,
+          "size_formatted": "77 B",
+          "sizeFormatted": "77 B",
+          "extent_size": 77,
+          "extentSize": 77,
+          "extent_size_formatted": "77 B",
+          "extentSizeFormatted": "77 B",
+          "codec": "raw",
+          "sha256": "4fea34bbcde01b98dd42cb00611e8c51b356ab361d14539a209a0415a6ebbcd4"
+        }
+      ]
+    }
+  ]
+}

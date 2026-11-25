@@ -1,0 +1,32 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/nup-core",
+    "crates/nup-host-logic",
+    "app",
+    "tools/differential",
+]
+
+[workspace.package]
+version = "1.0.11"
+edition = "2024"
+license = "MIT"
+authors = ["SPIN0ZAi"]
+repository = "https://github.com/SPIN0ZAi/nup-extractor"
+
+[workspace.dependencies]
+base64 = "0.22"
+memmap2 = "0.9"
+proptest = "1.6"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+tempfile = "3.15"
+thiserror = "2.0"
+zstd = "0.13"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+opt-level = 3

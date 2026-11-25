@@ -1,0 +1,15 @@
+{
+  "fixture": "base_only",
+  "fast": {
+    "deep": false,
+    "valid": true,
+    "totalFilesChecked": 4,
+    "problems": []
+  },
+  "deep": {
+    "deep": true,
+    "valid": true,
+    "totalFilesChecked": 4,
+    "problems": []
+  }
+}

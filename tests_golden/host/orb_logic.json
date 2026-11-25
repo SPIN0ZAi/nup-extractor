@@ -1,0 +1,820 @@
+{
+  "expandTrace": [
+    {
+      "tMs": 16,
+      "state": "Expanding",
+      "progress": 0.080448,
+      "isAnimating": true
+    },
+    {
+      "tMs": 48,
+      "state": "Expanding",
+      "progress": 0.339602,
+      "isAnimating": true
+    },
+    {
+      "tMs": 80,
+      "state": "Expanding",
+      "progress": 0.567591,
+      "isAnimating": true
+    },
+    {
+      "tMs": 112,
+      "state": "Expanding",
+      "progress": 0.727244,
+      "isAnimating": true
+    },
+    {
+      "tMs": 144,
+      "state": "Expanding",
+      "progress": 0.830769,
+      "isAnimating": true
+    },
+    {
+      "tMs": 176,
+      "state": "Expanding",
+      "progress": 0.895796,
+      "isAnimating": true
+    },
+    {
+      "tMs": 208,
+      "state": "Expanding",
+      "progress": 0.936064,
+      "isAnimating": true
+    },
+    {
+      "tMs": 240,
+      "state": "Expanding",
+      "progress": 0.960837,
+      "isAnimating": true
+    },
+    {
+      "tMs": 272,
+      "state": "Expanding",
+      "progress": 0.97603,
+      "isAnimating": true
+    },
+    {
+      "tMs": 304,
+      "state": "Expanding",
+      "progress": 0.985335,
+      "isAnimating": true
+    },
+    {
+      "tMs": 336,
+      "state": "Expanding",
+      "progress": 0.991029,
+      "isAnimating": true
+    },
+    {
+      "tMs": 368,
+      "state": "Expanding",
+      "progress": 0.994513,
+      "isAnimating": true
+    },
+    {
+      "tMs": 400,
+      "state": "Expanded",
+      "progress": 1,
+      "isAnimating": false
+    },
+    {
+      "tMs": 432,
+      "state": "Expanded",
+      "progress": 1,
+      "isAnimating": false
+    },
+    {
+      "tMs": 464,
+      "state": "Expanded",
+      "progress": 1,
+      "isAnimating": false
+    }
+  ],
+  "interruptTrace": [
+    {
+      "tMs": 128,
+      "state": "Collapsing",
+      "progress": 0.784865,
+      "isAnimating": true
+    },
+    {
+      "tMs": 160,
+      "state": "Collapsing",
+      "progress": 0.660419,
+      "isAnimating": true
+    },
+    {
+      "tMs": 192,
+      "state": "Collapsing",
+      "progress": 0.456391,
+      "isAnimating": true
+    },
+    {
+      "tMs": 224,
+      "state": "Collapsing",
+      "progress": 0.294395,
+      "isAnimating": true
+    },
+    {
+      "tMs": 256,
+      "state": "Collapsing",
+      "progress": 0.184494,
+      "isAnimating": true
+    },
+    {
+      "tMs": 288,
+      "state": "Collapsing",
+      "progress": 0.114129,
+      "isAnimating": true
+    },
+    {
+      "tMs": 320,
+      "state": "Collapsing",
+      "progress": 0.070178,
+      "isAnimating": true
+    },
+    {
+      "tMs": 352,
+      "state": "Collapsing",
+      "progress": 0.04303,
+      "isAnimating": true
+    },
+    {
+      "tMs": 384,
+      "state": "Collapsing",
+      "progress": 0.026349,
+      "isAnimating": true
+    },
+    {
+      "tMs": 416,
+      "state": "Collapsing",
+      "progress": 0.016125,
+      "isAnimating": true
+    },
+    {
+      "tMs": 448,
+      "state": "Collapsing",
+      "progress": 0.009865,
+      "isAnimating": true
+    },
+    {
+      "tMs": 480,
+      "state": "Collapsing",
+      "progress": 0.006034,
+      "isAnimating": true
+    },
+    {
+      "tMs": 512,
+      "state": "Collapsed",
+      "progress": 0,
+      "isAnimating": false
+    },
+    {
+      "tMs": 544,
+      "state": "Collapsed",
+      "progress": 0,
+      "isAnimating": false
+    },
+    {
+      "tMs": 576,
+      "state": "Collapsed",
+      "progress": 0,
+      "isAnimating": false
+    },
+    {
+      "tMs": 608,
+      "state": "Collapsed",
+      "progress": 0,
+      "isAnimating": false
+    }
+  ],
+  "reducedMotionTrace": [
+    {
+      "tMs": 35,
+      "state": "Expanding",
+      "progress": 0.25,
+      "isAnimating": true
+    },
+    {
+      "tMs": 70,
+      "state": "Expanding",
+      "progress": 0.5,
+      "isAnimating": true
+    },
+    {
+      "tMs": 105,
+      "state": "Expanding",
+      "progress": 0.75,
+      "isAnimating": true
+    },
+    {
+      "tMs": 140,
+      "state": "Expanded",
+      "progress": 1,
+      "isAnimating": false
+    },
+    {
+      "tMs": 175,
+      "state": "Expanded",
+      "progress": 1,
+      "isAnimating": false
+    }
+  ],
+  "dpiTable": [
+    {
+      "dpiScale": 1,
+      "orbPx": 64,
+      "marginPx": 14,
+      "expandedRadiusPx": 28
+    },
+    {
+      "dpiScale": 1.25,
+      "orbPx": 80,
+      "marginPx": 18,
+      "expandedRadiusPx": 35
+    },
+    {
+      "dpiScale": 1.5,
+      "orbPx": 96,
+      "marginPx": 21,
+      "expandedRadiusPx": 42
+    },
+    {
+      "dpiScale": 2,
+      "orbPx": 128,
+      "marginPx": 28,
+      "expandedRadiusPx": 56
+    }
+  ],
+  "snapCases": [
+    {
+      "label": "bottom_taskbar_left",
+      "work": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1032,
+        "left": 0,
+        "top": 0,
+        "right": 1920,
+        "bottom": 1032,
+        "centerX": 960,
+        "centerY": 516
+      },
+      "orb": {
+        "x": 200,
+        "y": 500,
+        "width": 64,
+        "height": 64,
+        "left": 200,
+        "top": 500,
+        "right": 264,
+        "bottom": 564,
+        "centerX": 232,
+        "centerY": 532
+      },
+      "margin": 14,
+      "snapped": {
+        "x": 14,
+        "y": 500,
+        "width": 64,
+        "height": 64,
+        "left": 14,
+        "top": 500,
+        "right": 78,
+        "bottom": 564,
+        "centerX": 46,
+        "centerY": 532
+      },
+      "edge": "Left"
+    },
+    {
+      "label": "bottom_taskbar_right",
+      "work": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1032,
+        "left": 0,
+        "top": 0,
+        "right": 1920,
+        "bottom": 1032,
+        "centerX": 960,
+        "centerY": 516
+      },
+      "orb": {
+        "x": 1700,
+        "y": 500,
+        "width": 64,
+        "height": 64,
+        "left": 1700,
+        "top": 500,
+        "right": 1764,
+        "bottom": 564,
+        "centerX": 1732,
+        "centerY": 532
+      },
+      "margin": 14,
+      "snapped": {
+        "x": 1842,
+        "y": 500,
+        "width": 64,
+        "height": 64,
+        "left": 1842,
+        "top": 500,
+        "right": 1906,
+        "bottom": 564,
+        "centerX": 1874,
+        "centerY": 532
+      },
+      "edge": "Right"
+    },
+    {
+      "label": "bottom_taskbar_top",
+      "work": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1032,
+        "left": 0,
+        "top": 0,
+        "right": 1920,
+        "bottom": 1032,
+        "centerX": 960,
+        "centerY": 516
+      },
+      "orb": {
+        "x": 960,
+        "y": 80,
+        "width": 64,
+        "height": 64,
+        "left": 960,
+        "top": 80,
+        "right": 1024,
+        "bottom": 144,
+        "centerX": 992,
+        "centerY": 112
+      },
+      "margin": 14,
+      "snapped": {
+        "x": 960,
+        "y": 14,
+        "width": 64,
+        "height": 64,
+        "left": 960,
+        "top": 14,
+        "right": 1024,
+        "bottom": 78,
+        "centerX": 992,
+        "centerY": 46
+      },
+      "edge": "Top"
+    },
+    {
+      "label": "bottom_taskbar_bottom",
+      "work": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1032,
+        "left": 0,
+        "top": 0,
+        "right": 1920,
+        "bottom": 1032,
+        "centerX": 960,
+        "centerY": 516
+      },
+      "orb": {
+        "x": 960,
+        "y": 960,
+        "width": 64,
+        "height": 64,
+        "left": 960,
+        "top": 960,
+        "right": 1024,
+        "bottom": 1024,
+        "centerX": 992,
+        "centerY": 992
+      },
+      "margin": 14,
+      "snapped": {
+        "x": 960,
+        "y": 954,
+        "width": 64,
+        "height": 64,
+        "left": 960,
+        "top": 954,
+        "right": 1024,
+        "bottom": 1018,
+        "centerX": 992,
+        "centerY": 986
+      },
+      "edge": "Bottom"
+    },
+    {
+      "label": "left_taskbar",
+      "work": {
+        "x": 72,
+        "y": 0,
+        "width": 1848,
+        "height": 1080,
+        "left": 72,
+        "top": 0,
+        "right": 1920,
+        "bottom": 1080,
+        "centerX": 996,
+        "centerY": 540
+      },
+      "orb": {
+        "x": 10,
+        "y": 400,
+        "width": 64,
+        "height": 64,
+        "left": 10,
+        "top": 400,
+        "right": 74,
+        "bottom": 464,
+        "centerX": 42,
+        "centerY": 432
+      },
+      "margin": 14,
+      "snapped": {
+        "x": 86,
+        "y": 400,
+        "width": 64,
+        "height": 64,
+        "left": 86,
+        "top": 400,
+        "right": 150,
+        "bottom": 464,
+        "centerX": 118,
+        "centerY": 432
+      },
+      "edge": "Left"
+    },
+    {
+      "label": "top_taskbar",
+      "work": {
+        "x": 0,
+        "y": 48,
+        "width": 1920,
+        "height": 1032,
+        "left": 0,
+        "top": 48,
+        "right": 1920,
+        "bottom": 1080,
+        "centerX": 960,
+        "centerY": 564
+      },
+      "orb": {
+        "x": 900,
+        "y": 5,
+        "width": 64,
+        "height": 64,
+        "left": 900,
+        "top": 5,
+        "right": 964,
+        "bottom": 69,
+        "centerX": 932,
+        "centerY": 37
+      },
+      "margin": 14,
+      "snapped": {
+        "x": 900,
+        "y": 62,
+        "width": 64,
+        "height": 64,
+        "left": 900,
+        "top": 62,
+        "right": 964,
+        "bottom": 126,
+        "centerX": 932,
+        "centerY": 94
+      },
+      "edge": "Top"
+    },
+    {
+      "label": "right_taskbar",
+      "work": {
+        "x": 0,
+        "y": 0,
+        "width": 1848,
+        "height": 1080,
+        "left": 0,
+        "top": 0,
+        "right": 1848,
+        "bottom": 1080,
+        "centerX": 924,
+        "centerY": 540
+      },
+      "orb": {
+        "x": 1890,
+        "y": 400,
+        "width": 64,
+        "height": 64,
+        "left": 1890,
+        "top": 400,
+        "right": 1954,
+        "bottom": 464,
+        "centerX": 1922,
+        "centerY": 432
+      },
+      "margin": 14,
+      "snapped": {
+        "x": 1770,
+        "y": 400,
+        "width": 64,
+        "height": 64,
+        "left": 1770,
+        "top": 400,
+        "right": 1834,
+        "bottom": 464,
+        "centerX": 1802,
+        "centerY": 432
+      },
+      "edge": "Right"
+    },
+    {
+      "label": "neg_monitor_150dpi",
+      "work": {
+        "x": 1920,
+        "y": -116,
+        "width": 2560,
+        "height": 1380,
+        "left": 1920,
+        "top": -116,
+        "right": 4480,
+        "bottom": 1264,
+        "centerX": 3200,
+        "centerY": 574
+      },
+      "orb": {
+        "x": 4400,
+        "y": 100,
+        "width": 96,
+        "height": 96,
+        "left": 4400,
+        "top": 100,
+        "right": 4496,
+        "bottom": 196,
+        "centerX": 4448,
+        "centerY": 148
+      },
+      "margin": 21,
+      "snapped": {
+        "x": 4363,
+        "y": 100,
+        "width": 96,
+        "height": 96,
+        "left": 4363,
+        "top": 100,
+        "right": 4459,
+        "bottom": 196,
+        "centerX": 4411,
+        "centerY": 148
+      },
+      "edge": "Right"
+    }
+  ],
+  "expandNearCases": [
+    {
+      "label": "mon1_right",
+      "orb": {
+        "x": 1842,
+        "y": 360,
+        "width": 64,
+        "height": 64,
+        "left": 1842,
+        "top": 360,
+        "right": 1906,
+        "bottom": 424,
+        "centerX": 1874,
+        "centerY": 392
+      },
+      "monitor": {
+        "deviceName": "\\\\.\\DISPLAY1",
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "left": 0,
+          "top": 0,
+          "right": 1920,
+          "bottom": 1080,
+          "centerX": 960,
+          "centerY": 540
+        },
+        "workArea": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1032,
+          "left": 0,
+          "top": 0,
+          "right": 1920,
+          "bottom": 1032,
+          "centerX": 960,
+          "centerY": 516
+        },
+        "dpiScale": 1,
+        "isPrimary": true
+      },
+      "expanded": {
+        "x": 662,
+        "y": 18,
+        "width": 1240,
+        "height": 820,
+        "left": 662,
+        "top": 18,
+        "right": 1902,
+        "bottom": 838,
+        "centerX": 1282,
+        "centerY": 428
+      }
+    },
+    {
+      "label": "mon1_left",
+      "orb": {
+        "x": 14,
+        "y": 480,
+        "width": 64,
+        "height": 64,
+        "left": 14,
+        "top": 480,
+        "right": 78,
+        "bottom": 544,
+        "centerX": 46,
+        "centerY": 512
+      },
+      "monitor": {
+        "deviceName": "\\\\.\\DISPLAY1",
+        "bounds": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "left": 0,
+          "top": 0,
+          "right": 1920,
+          "bottom": 1080,
+          "centerX": 960,
+          "centerY": 540
+        },
+        "workArea": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1032,
+          "left": 0,
+          "top": 0,
+          "right": 1920,
+          "bottom": 1032,
+          "centerX": 960,
+          "centerY": 516
+        },
+        "dpiScale": 1,
+        "isPrimary": true
+      },
+      "expanded": {
+        "x": 18,
+        "y": 102,
+        "width": 1240,
+        "height": 820,
+        "left": 18,
+        "top": 102,
+        "right": 1258,
+        "bottom": 922,
+        "centerX": 638,
+        "centerY": 512
+      }
+    },
+    {
+      "label": "mon2_150dpi_negY",
+      "orb": {
+        "x": 4363,
+        "y": 100,
+        "width": 96,
+        "height": 96,
+        "left": 4363,
+        "top": 100,
+        "right": 4459,
+        "bottom": 196,
+        "centerX": 4411,
+        "centerY": 148
+      },
+      "monitor": {
+        "deviceName": "\\\\.\\DISPLAY2",
+        "bounds": {
+          "x": 1920,
+          "y": -116,
+          "width": 2560,
+          "height": 1440,
+          "left": 1920,
+          "top": -116,
+          "right": 4480,
+          "bottom": 1324,
+          "centerX": 3200,
+          "centerY": 604
+        },
+        "workArea": {
+          "x": 1920,
+          "y": -116,
+          "width": 2560,
+          "height": 1380,
+          "left": 1920,
+          "top": -116,
+          "right": 4480,
+          "bottom": 1264,
+          "centerX": 3200,
+          "centerY": 574
+        },
+        "dpiScale": 1.5,
+        "isPrimary": false
+      },
+      "expanded": {
+        "x": 2593,
+        "y": 7,
+        "width": 1860,
+        "height": 1230,
+        "left": 2593,
+        "top": 7,
+        "right": 4453,
+        "bottom": 1237,
+        "centerX": 3523,
+        "centerY": 622
+      }
+    },
+    {
+      "label": "mon3_small_negX",
+      "orb": {
+        "x": -1350,
+        "y": 300,
+        "width": 80,
+        "height": 80,
+        "left": -1350,
+        "top": 300,
+        "right": -1270,
+        "bottom": 380,
+        "centerX": -1310,
+        "centerY": 340
+      },
+      "monitor": {
+        "deviceName": "\\\\.\\DISPLAY3",
+        "bounds": {
+          "x": -1366,
+          "y": 0,
+          "width": 1366,
+          "height": 768,
+          "left": -1366,
+          "top": 0,
+          "right": 0,
+          "bottom": 768,
+          "centerX": -683,
+          "centerY": 384
+        },
+        "workArea": {
+          "x": -1366,
+          "y": 0,
+          "width": 1366,
+          "height": 728,
+          "left": -1366,
+          "top": 0,
+          "right": 0,
+          "bottom": 728,
+          "centerX": -683,
+          "centerY": 364
+        },
+        "dpiScale": 1.25,
+        "isPrimary": false
+      },
+      "expanded": {
+        "x": -1343,
+        "y": 23,
+        "width": 1320,
+        "height": 682,
+        "left": -1343,
+        "top": 23,
+        "right": -23,
+        "bottom": 705,
+        "centerX": -683,
+        "centerY": 364
+      }
+    }
+  ],
+  "sampleSettings": {
+    "hasSavedPosition": true,
+    "orbCenterX": 1874,
+    "orbCenterY": 392,
+    "anchorFractionX": 0.9760416666666667,
+    "anchorFractionY": 0.3798449612403101,
+    "orbEdge": "Right",
+    "monitorDeviceName": "\\\\.\\DISPLAY1",
+    "lastMode": "Collapsed",
+    "launchMode": "Collapsed",
+    "expandedWidthDip": 1240,
+    "expandedHeightDip": 820,
+    "theme": "dark"
+  }
+}

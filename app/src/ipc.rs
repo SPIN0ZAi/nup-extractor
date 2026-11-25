@@ -1,0 +1,900 @@
+#![forbid(unsafe_code)]
+
+use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
+
+use nup_core::{
+    PackOptions, check_disk_space, detect_package_summary, extract, extract_single_file,
+    get_dir_children, inspect, pack, search_files, verify,
+};
+use nup_host_logic::{OrbLaunchMode, OrbSettings, OrbSettingsStore, ScreenEdge};
+use serde_json::{Value, json};
+
+use crate::backdrop::SystemAppearanceState;
+use crate::shell_integration;
+use crate::updater;
+
+/// Commands routed from IPC back to the native window/UI thread.
+#[derive(Debug, Clone)]
+pub enum WindowCommand {
+    OrbExpand,
+    OrbCollapse,
+    OrbDragStart,
+    OrbDragMove,
+    OrbDragEnd,
+    WindowDragStart,
+    WindowToggleMaximize,
+    WindowClose,
+    UpdateTooltip(String),
+    ThemeOrSettingsChanged {
+        launch_mode: Option<OrbLaunchMode>,
+        theme: Option<String>,
+        reply_id: String,
+    },
+    GetOrbSettings {
+        reply_id: String,
+    },
+    BrowseFile {
+        reply_id: String,
+    },
+    BrowseFolder {
+        reply_id: String,
+    },
+    BrowsePackFolder {
+        reply_id: String,
+    },
+    BrowsePackOutput {
+        reply_id: String,
+        default_name: String,
+    },
+    ExtractSingleFile {
+        reply_id: String,
+        nup_path: String,
+        file_index: usize,
+        suggested_name: String,
+    },
+    FileDropped {
+        target: String,
+        paths: Vec<String>,
+    },
+}
+
+/// Sink for sending JSON IPC messages back to WebView2 (or capturing them in contract tests).
+pub trait IpcSink: Send + Sync + 'static {
+    fn send_json(&self, value: Value);
+    fn dispatch_window(&self, cmd: WindowCommand);
+}
+
+pub struct IpcRouter {
+    sink: Arc<dyn IpcSink>,
+    initial_file_path: Option<String>,
+    auto_extract_files: Vec<String>,
+    extract_cancel: Mutex<Arc<AtomicBool>>,
+    verify_cancel: Mutex<Arc<AtomicBool>>,
+    pack_cancel: Mutex<Arc<AtomicBool>>,
+    update_cancel: Mutex<Arc<AtomicBool>>,
+    last_checksum_url: Arc<Mutex<Option<String>>>,
+}
+
+impl IpcRouter {
+    pub fn new(
+        sink: Arc<dyn IpcSink>,
+        initial_file_path: Option<String>,
+        auto_extract_files: Vec<String>,
+    ) -> Self {
+        Self {
+            sink,
+            initial_file_path,
+            auto_extract_files,
+            extract_cancel: Mutex::new(Arc::new(AtomicBool::new(false))),
+            verify_cancel: Mutex::new(Arc::new(AtomicBool::new(false))),
+            pack_cancel: Mutex::new(Arc::new(AtomicBool::new(false))),
+            update_cancel: Mutex::new(Arc::new(AtomicBool::new(false))),
+            last_checksum_url: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    pub fn cancel_all(&self) {
+        for slot in [
+            &self.extract_cancel,
+            &self.verify_cancel,
+            &self.pack_cancel,
+            &self.update_cancel,
+        ] {
+            if let Ok(guard) = slot.lock() {
+                guard.store(true, Ordering::Relaxed);
+            }
+        }
+    }
+
+    /// Synchronous dispatcher for unit/golden contract testing (runs inline without spawning threads).
+    pub fn handle_message_sync(&self, raw_json: &str, dropped_paths: Vec<String>) {
+        self.handle_message_inner(raw_json, dropped_paths, false);
+    }
+
+    /// Async dispatcher for live GUI host (offloads heavy engine/network work to worker threads).
+    pub fn handle_message(&self, raw_json: &str, dropped_paths: Vec<String>) {
+        self.handle_message_inner(raw_json, dropped_paths, true);
+    }
+
+    fn handle_message_inner(&self, raw_json: &str, dropped_paths: Vec<String>, spawn_bg: bool) {
+        let root: Value = match serde_json::from_str(raw_json) {
+            Ok(v) => v,
+            Err(e) => {
+                self.sink.send_json(json!({
+                    "type": "error",
+                    "error": e.to_string()
+                }));
+                return;
+            }
+        };
+
+        let action = get_str(&root, &["action"]).unwrap_or_default();
+        let id = get_str(&root, &["id"]).unwrap_or_default();
+
+        match action.as_str() {
+            // --- Floating Orb & Window Controls ---
+            "orb_expand" => self.sink.dispatch_window(WindowCommand::OrbExpand),
+            "orb_collapse" => self.sink.dispatch_window(WindowCommand::OrbCollapse),
+            "orb_drag_start" => self.sink.dispatch_window(WindowCommand::OrbDragStart),
+            "orb_drag_move" => self.sink.dispatch_window(WindowCommand::OrbDragMove),
+            "orb_drag_end" => self.sink.dispatch_window(WindowCommand::OrbDragEnd),
+            "window_drag_start" => self.sink.dispatch_window(WindowCommand::WindowDragStart),
+            "window_toggle_maximize" => self
+                .sink
+                .dispatch_window(WindowCommand::WindowToggleMaximize),
+            "window_close" => self.sink.dispatch_window(WindowCommand::WindowClose),
+            "orb_file_drop" => {
+                let target = get_str(&root, &["target"]).unwrap_or_else(|| "orb".to_string());
+                self.sink.dispatch_window(WindowCommand::FileDropped {
+                    target,
+                    paths: dropped_paths,
+                });
+            }
+            "get_orb_settings" => {
+                self.sink
+                    .dispatch_window(WindowCommand::GetOrbSettings { reply_id: id });
+            }
+            "update_orb_settings" => {
+                let launch_mode =
+                    get_str(&root, &["launchMode"]).map(|s| OrbLaunchMode::parse_lossy(&s));
+                let theme = get_str(&root, &["theme"]);
+                self.sink
+                    .dispatch_window(WindowCommand::ThemeOrSettingsChanged {
+                        launch_mode,
+                        theme,
+                        reply_id: id,
+                    });
+            }
+            "task_progress_update" => {
+                let task = get_str(&root, &["task"]).unwrap_or_default();
+                let state = get_str(&root, &["state"]).unwrap_or_else(|| "idle".to_string());
+                let pct = get_i64(&root, &["percent"]).unwrap_or(0);
+                let tip = if state == "running" {
+                    let label = match task.as_str() {
+                        "verify" => "Verifying",
+                        "pack" => "Packing",
+                        _ => "Extracting",
+                    };
+                    format!("NUP Extractor — {label} ({pct}%)")
+                } else if state == "done" {
+                    "NUP Extractor — Task Complete".to_string()
+                } else {
+                    "NUP Extractor".to_string()
+                };
+                self.sink.dispatch_window(WindowCommand::UpdateTooltip(tip));
+            }
+
+            // --- Dialogs (must run on UI thread) ---
+            "browse_file" => self
+                .sink
+                .dispatch_window(WindowCommand::BrowseFile { reply_id: id }),
+            "browse_folder" => self
+                .sink
+                .dispatch_window(WindowCommand::BrowseFolder { reply_id: id }),
+            "browse_pack_folder" => self
+                .sink
+                .dispatch_window(WindowCommand::BrowsePackFolder { reply_id: id }),
+            "browse_pack_output" => {
+                let default_name =
+                    get_str(&root, &["defaultName", "name"]).unwrap_or_else(|| "game".to_string());
+                self.sink.dispatch_window(WindowCommand::BrowsePackOutput {
+                    reply_id: id,
+                    default_name,
+                });
+            }
+            "extract_single_file" => {
+                let nup_path = get_str(&root, &["filePath", "file_path"]).unwrap_or_default();
+                let file_index = get_i64(&root, &["fileIndex", "file_index"]).unwrap_or(-1);
+                let suggested_name = get_str(&root, &["fileName", "file_name", "name"])
+                    .unwrap_or_else(|| "extracted_file".to_string());
+                if nup_path.trim().is_empty() || !Path::new(&nup_path).exists() || file_index < 0 {
+                    self.sink.send_json(json!({
+                        "id": id,
+                        "action": "extract_single_file_result",
+                        "success": false,
+                        "error": "Invalid file parameters."
+                    }));
+                } else {
+                    self.sink.dispatch_window(WindowCommand::ExtractSingleFile {
+                        reply_id: id,
+                        nup_path,
+                        file_index: file_index as usize,
+                        suggested_name,
+                    });
+                }
+            }
+
+            // --- Core NUP Engine Operations ---
+            "get_app_info" => {
+                self.sink.send_json(json!({
+                    "id": id,
+                    "action": "app_info_result",
+                    "success": true,
+                    "version": updater::CURRENT_VERSION,
+                    "initialFilePath": self.initial_file_path,
+                    "autoExtractFiles": self.auto_extract_files
+                }));
+            }
+            "inspect" => {
+                let file_path = get_str(&root, &["filePath", "file_path", "path"]);
+                let sink = Arc::clone(&self.sink);
+                let run = move || match file_path {
+                    Some(fp) if !fp.trim().is_empty() => match inspect(&fp) {
+                        Ok(data) => sink.send_json(json!({
+                            "id": id,
+                            "action": "inspect_result",
+                            "success": true,
+                            "data": data
+                        })),
+                        Err(e) => sink.send_json(json!({
+                            "id": id,
+                            "action": "inspect_result",
+                            "success": false,
+                            "error": e.to_string()
+                        })),
+                    },
+                    _ => sink.send_json(json!({
+                        "id": id,
+                        "action": "inspect_result",
+                        "success": false,
+                        "error": "File path is required"
+                    })),
+                };
+                if spawn_bg {
+                    std::thread::spawn(run);
+                } else {
+                    run();
+                }
+            }
+            "get_tree" => {
+                let file_path = get_str(&root, &["filePath", "file_path"]);
+                let dir_index = get_i64(&root, &["dirIndex", "dir_index"]).unwrap_or(0) as u32;
+                let sink = Arc::clone(&self.sink);
+                let run = move || match file_path {
+                    Some(fp) if !fp.trim().is_empty() => match get_dir_children(&fp, dir_index) {
+                        Ok(data) => sink.send_json(json!({
+                            "id": id,
+                            "action": "get_tree_result",
+                            "success": true,
+                            "data": data
+                        })),
+                        Err(e) => sink.send_json(json!({
+                            "id": id,
+                            "action": "get_tree_result",
+                            "success": false,
+                            "error": e.to_string()
+                        })),
+                    },
+                    _ => sink.send_json(json!({
+                        "id": id,
+                        "action": "get_tree_result",
+                        "success": false,
+                        "error": "File path is required"
+                    })),
+                };
+                if spawn_bg {
+                    std::thread::spawn(run);
+                } else {
+                    run();
+                }
+            }
+            "search" => {
+                let file_path = get_str(&root, &["filePath", "file_path"]);
+                let query = get_str(&root, &["query", "q"]).unwrap_or_default();
+                let sink = Arc::clone(&self.sink);
+                let run = move || match file_path {
+                    Some(fp) if !fp.trim().is_empty() => match search_files(&fp, &query, 500) {
+                        Ok(results) => sink.send_json(json!({
+                            "id": id,
+                            "action": "search_result",
+                            "success": true,
+                            "query": query,
+                            "results": results
+                        })),
+                        Err(e) => sink.send_json(json!({
+                            "id": id,
+                            "action": "search_result",
+                            "success": false,
+                            "error": e.to_string()
+                        })),
+                    },
+                    _ => sink.send_json(json!({
+                        "id": id,
+                        "action": "search_result",
+                        "success": false,
+                        "error": "File path is required"
+                    })),
+                };
+                if spawn_bg {
+                    std::thread::spawn(run);
+                } else {
+                    run();
+                }
+            }
+            "extract" => {
+                let file_path = get_str(&root, &["filePath", "file_path"]).unwrap_or_default();
+                let dest_dir = get_str(&root, &["destDir", "dest_dir"]).unwrap_or_default();
+                let mode = get_str(&root, &["mode"]).unwrap_or_else(|| "all".to_string());
+                let pkg_idx =
+                    get_i64(&root, &["packageIndex", "package_index"]).map(|v| v as usize);
+                let subtree = get_str(&root, &["subtreePath", "subtree_path"]);
+                let open_when_done =
+                    get_bool(&root, &["openWhenDone", "open_when_done"]).unwrap_or(true);
+
+                if file_path.trim().is_empty() || !Path::new(&file_path).exists() {
+                    self.sink.send_json(json!({
+                        "type": "extract_error",
+                        "error": format!("NUP container file not found: {file_path}")
+                    }));
+                    return;
+                }
+                if dest_dir.trim().is_empty() {
+                    self.sink.send_json(json!({
+                        "type": "extract_error",
+                        "error": "Destination directory cannot be empty."
+                    }));
+                    return;
+                }
+
+                let cancel = reset_cancel(&self.extract_cancel);
+                let sink = Arc::clone(&self.sink);
+                let run = move || {
+                    let sw = Instant::now();
+                    let res = extract(
+                        &file_path,
+                        &dest_dir,
+                        &mode,
+                        pkg_idx,
+                        subtree.as_deref(),
+                        |info| {
+                            sink.dispatch_window(WindowCommand::UpdateTooltip(format!(
+                                "NUP Extractor — Extracting {}%",
+                                info.percent.round() as i64
+                            )));
+                            sink.send_json(json!({
+                                "type": "extract_progress",
+                                "info": info
+                            }));
+                        },
+                        &cancel,
+                    );
+                    match res {
+                        Ok(()) => {
+                            if open_when_done {
+                                open_folder_in_explorer(&dest_dir);
+                            }
+                            sink.dispatch_window(WindowCommand::UpdateTooltip(
+                                "NUP Extractor — Extraction Complete".to_string(),
+                            ));
+                            sink.send_json(json!({
+                                "type": "extract_done",
+                                "success": true,
+                                "destDir": dest_dir,
+                                "elapsedSeconds": sw.elapsed().as_secs_f64()
+                            }));
+                        }
+                        Err(nup_core::NupError::Cancelled) => {
+                            sink.dispatch_window(WindowCommand::UpdateTooltip(
+                                "NUP Extractor".to_string(),
+                            ));
+                            sink.send_json(json!({
+                                "type": "extract_error",
+                                "error": "Extraction cancelled by user."
+                            }));
+                        }
+                        Err(e) => {
+                            sink.dispatch_window(WindowCommand::UpdateTooltip(
+                                "NUP Extractor".to_string(),
+                            ));
+                            sink.send_json(json!({
+                                "type": "extract_error",
+                                "error": e.to_string()
+                            }));
+                        }
+                    }
+                };
+                if spawn_bg {
+                    std::thread::spawn(run);
+                } else {
+                    run();
+                }
+            }
+            "cancel_extract" => trigger_cancel(&self.extract_cancel),
+
+            "verify" => {
+                let file_path = get_str(&root, &["filePath", "file_path"]).unwrap_or_default();
+                let deep = get_bool(&root, &["deep"]).unwrap_or(true);
+                if file_path.trim().is_empty() || !Path::new(&file_path).exists() {
+                    self.sink.send_json(json!({
+                        "type": "verify_error",
+                        "error": format!("NUP container file not found: {file_path}")
+                    }));
+                    return;
+                }
+                let cancel = reset_cancel(&self.verify_cancel);
+                let sink = Arc::clone(&self.sink);
+                let run = move || {
+                    let res = verify(
+                        &file_path,
+                        deep,
+                        |info| {
+                            if info.status == "done" {
+                                sink.dispatch_window(WindowCommand::UpdateTooltip(
+                                    "NUP Extractor — Verification Complete".to_string(),
+                                ));
+                                sink.send_json(json!({
+                                    "type": "verify_done",
+                                    "info": info
+                                }));
+                            } else {
+                                sink.dispatch_window(WindowCommand::UpdateTooltip(format!(
+                                    "NUP Extractor — Verifying {}%",
+                                    info.percent.round() as i64
+                                )));
+                                sink.send_json(json!({
+                                    "type": "verify_progress",
+                                    "info": info
+                                }));
+                            }
+                        },
+                        &cancel,
+                    );
+                    match res {
+                        Ok(_) => {}
+                        Err(nup_core::NupError::Cancelled) => {
+                            sink.dispatch_window(WindowCommand::UpdateTooltip(
+                                "NUP Extractor".to_string(),
+                            ));
+                            sink.send_json(json!({
+                                "type": "verify_error",
+                                "error": "Verification cancelled."
+                            }));
+                        }
+                        Err(e) => {
+                            sink.dispatch_window(WindowCommand::UpdateTooltip(
+                                "NUP Extractor".to_string(),
+                            ));
+                            sink.send_json(json!({
+                                "type": "verify_error",
+                                "error": e.to_string()
+                            }));
+                        }
+                    }
+                };
+                if spawn_bg {
+                    std::thread::spawn(run);
+                } else {
+                    run();
+                }
+            }
+            "cancel_verify" => trigger_cancel(&self.verify_cancel),
+
+            "open_folder" => {
+                if let Some(p) = get_str(&root, &["path", "folderPath"]) {
+                    open_folder_in_explorer(&p);
+                }
+            }
+
+            "check_disk_space" => {
+                let dest = get_str(&root, &["destDir", "dest_dir", "path"]).unwrap_or_default();
+                let req_bytes = get_u64(&root, &["requiredBytes", "required_bytes"]).unwrap_or(0);
+                let info = check_disk_space(&dest, req_bytes);
+                self.sink.send_json(json!({
+                    "id": id,
+                    "action": "check_disk_space_result",
+                    "success": true,
+                    "data": info
+                }));
+            }
+
+            "get_shell_integration_status" => {
+                self.sink.send_json(json!({
+                    "id": id,
+                    "action": "shell_integration_status_result",
+                    "success": true,
+                    "registered": shell_integration::is_registered()
+                }));
+            }
+            "toggle_shell_integration" => {
+                let enable = get_bool(&root, &["enable"]).unwrap_or(false);
+                let ok = if enable {
+                    shell_integration::register()
+                } else {
+                    shell_integration::unregister()
+                };
+                self.sink.send_json(json!({
+                    "id": id,
+                    "action": "toggle_shell_integration_result",
+                    "success": ok,
+                    "registered": shell_integration::is_registered()
+                }));
+            }
+
+            "inspect_pack_source" => {
+                let src = get_str(&root, &["sourceDir", "source_dir"]).unwrap_or_default();
+                if !src.trim().is_empty() && Path::new(&src).is_dir() {
+                    let pkgs = detect_package_summary(&src);
+                    self.sink.send_json(json!({
+                        "id": id,
+                        "action": "inspect_pack_source_result",
+                        "success": true,
+                        "packages": pkgs
+                    }));
+                } else {
+                    self.sink.send_json(json!({
+                        "id": id,
+                        "action": "inspect_pack_source_result",
+                        "success": false,
+                        "packages": []
+                    }));
+                }
+            }
+
+            "start_pack" => {
+                let source_dir = get_str(&root, &["sourceDir", "source_dir"]).unwrap_or_default();
+                let output_path =
+                    get_str(&root, &["outputPath", "output_path"]).unwrap_or_default();
+                if source_dir.trim().is_empty() || !Path::new(&source_dir).is_dir() {
+                    self.sink.send_json(json!({
+                        "type": "pack_error",
+                        "error": format!("Source directory not found: {source_dir}")
+                    }));
+                    return;
+                }
+                if output_path.trim().is_empty() {
+                    self.sink.send_json(json!({
+                        "type": "pack_error",
+                        "error": "Output file path cannot be empty."
+                    }));
+                    return;
+                }
+                let default_title = Path::new(&source_dir)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| "Custom Game".to_string());
+                let title_name =
+                    get_str(&root, &["titleName", "title_name"]).unwrap_or(default_title);
+                let publisher =
+                    get_str(&root, &["publisher"]).unwrap_or_else(|| "Homebrew / Mod".to_string());
+                let version_str =
+                    get_str(&root, &["version"]).unwrap_or_else(|| "1.0.0".to_string());
+                let compression_level =
+                    get_i64(&root, &["compressionLevel", "compression_level"]).unwrap_or(3) as i32;
+                let mut title_id = 0x0100_0000_0000_1000u64;
+                if let Some(tid_s) = get_str(&root, &["titleId", "title_id"]) {
+                    let clean = tid_s
+                        .trim()
+                        .trim_start_matches("0x")
+                        .trim_start_matches("0X");
+                    if let Ok(parsed) = u64::from_str_radix(clean, 16) {
+                        title_id = parsed;
+                    }
+                }
+
+                let opts = PackOptions {
+                    source_directory: source_dir,
+                    output_file_path: output_path,
+                    title_name,
+                    publisher,
+                    title_id,
+                    version_string: version_str,
+                    compression_level,
+                    icon_path: None,
+                };
+                let cancel = reset_cancel(&self.pack_cancel);
+                let sink = Arc::clone(&self.sink);
+                let run = move || {
+                    let sw = Instant::now();
+                    match pack(
+                        &opts,
+                        |info| {
+                            sink.dispatch_window(WindowCommand::UpdateTooltip(format!(
+                                "NUP Extractor — Packing {}%",
+                                info.percent.round() as i64
+                            )));
+                            sink.send_json(json!({
+                                "type": "pack_progress",
+                                "info": info
+                            }));
+                        },
+                        &cancel,
+                    ) {
+                        Ok(()) => {
+                            sink.dispatch_window(WindowCommand::UpdateTooltip(
+                                "NUP Extractor — Packaging Complete".to_string(),
+                            ));
+                            sink.send_json(json!({
+                                "type": "pack_done",
+                                "outputPath": opts.output_file_path,
+                                "sourceDir": opts.source_directory,
+                                "elapsedSeconds": sw.elapsed().as_secs_f64()
+                            }));
+                        }
+                        Err(nup_core::NupError::Cancelled) => {
+                            sink.dispatch_window(WindowCommand::UpdateTooltip(
+                                "NUP Extractor".to_string(),
+                            ));
+                            sink.send_json(json!({
+                                "type": "pack_error",
+                                "error": "Packaging cancelled by user."
+                            }));
+                        }
+                        Err(e) => {
+                            sink.dispatch_window(WindowCommand::UpdateTooltip(
+                                "NUP Extractor".to_string(),
+                            ));
+                            sink.send_json(json!({
+                                "type": "pack_error",
+                                "error": e.to_string()
+                            }));
+                        }
+                    }
+                };
+                if spawn_bg {
+                    std::thread::spawn(run);
+                } else {
+                    run();
+                }
+            }
+            "cancel_pack" => trigger_cancel(&self.pack_cancel),
+
+            // --- Auto-Updater ---
+            "check_update" => {
+                let manual = get_bool(&root, &["manual"]).unwrap_or(false);
+                let sink = Arc::clone(&self.sink);
+                let checksum_cache = Arc::clone(&self.last_checksum_url);
+                if spawn_bg {
+                    let sink_c = Arc::clone(&sink);
+                    std::thread::spawn(move || {
+                        let res = updater::check_for_updates();
+                        if let Ok(mut g) = checksum_cache.lock() {
+                            *g = res.checksum_url.clone();
+                        }
+                        let success = res.error.is_none();
+                        sink_c.send_json(json!({
+                            "id": id,
+                            "action": "check_update_result",
+                            "success": success,
+                            "error": res.error,
+                            "manual": manual,
+                            "data": res
+                        }));
+                    });
+                } else {
+                    let res = updater::check_for_updates();
+                    if let Ok(mut g) = checksum_cache.lock() {
+                        *g = res.checksum_url.clone();
+                    }
+                    let success = res.error.is_none();
+                    sink.send_json(json!({
+                        "id": id,
+                        "action": "check_update_result",
+                        "success": success,
+                        "error": res.error,
+                        "manual": manual,
+                        "data": res
+                    }));
+                }
+            }
+            "start_update" => {
+                let download_url =
+                    get_str(&root, &["downloadUrl", "download_url"]).unwrap_or_default();
+                let checksum_url = get_str(&root, &["checksumUrl", "checksum_url"])
+                    .or_else(|| self.last_checksum_url.lock().ok().and_then(|g| g.clone()));
+                if download_url.trim().is_empty() {
+                    self.sink.send_json(json!({
+                        "type": "update_error",
+                        "error": "No valid download URL provided for update."
+                    }));
+                    return;
+                }
+                let cancel = reset_cancel(&self.update_cancel);
+                let sink = Arc::clone(&self.sink);
+                let run = move || {
+                    let res = updater::apply_update_and_restart(
+                        &download_url,
+                        checksum_url.as_deref(),
+                        |info| {
+                            sink.send_json(json!({
+                                "type": "update_progress",
+                                "info": info
+                            }));
+                        },
+                        &cancel,
+                    );
+                    if let Err(err) = res {
+                        sink.send_json(json!({
+                            "type": "update_error",
+                            "error": err
+                        }));
+                    }
+                };
+                if spawn_bg {
+                    std::thread::spawn(run);
+                } else {
+                    run();
+                }
+            }
+            "cancel_update" => trigger_cancel(&self.update_cancel),
+
+            _ => {}
+        }
+    }
+}
+
+pub fn build_orb_settings_reply(
+    id: &str,
+    settings: &OrbSettings,
+    orb_edge: ScreenEdge,
+    state_lower: &str,
+    appearance: Option<SystemAppearanceState>,
+) -> Value {
+    if let Some(app) = appearance {
+        json!({
+            "id": id,
+            "action": "orb_settings_result",
+            "success": true,
+            "settings": {
+                "launchMode": settings.launch_mode.as_str(),
+                "theme": settings.theme,
+                "orbEdge": orb_edge.as_str(),
+                "state": state_lower
+            },
+            "appearance": {
+                "reducedMotion": app.reduced_motion,
+                "highContrast": app.high_contrast,
+                "transparencyEnabled": app.transparency_enabled
+            }
+        })
+    } else {
+        json!({
+            "id": id,
+            "action": "orb_settings_result",
+            "success": true,
+            "settings": {
+                "launchMode": settings.launch_mode.as_str(),
+                "theme": settings.theme,
+                "orbEdge": orb_edge.as_str(),
+                "state": state_lower
+            }
+        })
+    }
+}
+
+pub fn apply_orb_settings_update(
+    settings: &mut OrbSettings,
+    launch_mode: Option<OrbLaunchMode>,
+    theme: Option<&str>,
+) -> bool {
+    if let Some(lm) = launch_mode {
+        settings.launch_mode = lm;
+    }
+    let mut theme_changed = false;
+    if let Some(t) = theme
+        && !t.trim().is_empty()
+    {
+        settings.theme = if t.eq_ignore_ascii_case("light") {
+            "light".to_string()
+        } else {
+            "dark".to_string()
+        };
+        theme_changed = true;
+    }
+    OrbSettingsStore::save(settings, None);
+    theme_changed
+}
+
+pub fn run_extract_single_file_worker(
+    sink: Arc<dyn IpcSink>,
+    reply_id: String,
+    nup_path: String,
+    file_index: usize,
+    dest_path: String,
+) {
+    std::thread::spawn(
+        move || match extract_single_file(&nup_path, file_index, &dest_path) {
+            Ok(()) => {
+                let file_name = Path::new(&dest_path)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                sink.send_json(json!({
+                    "id": reply_id,
+                    "action": "extract_single_file_result",
+                    "success": true,
+                    "destPath": dest_path,
+                    "fileName": file_name
+                }));
+            }
+            Err(e) => {
+                sink.send_json(json!({
+                    "id": reply_id,
+                    "action": "extract_single_file_result",
+                    "success": false,
+                    "error": e.to_string()
+                }));
+            }
+        },
+    );
+}
+
+pub fn open_folder_in_explorer(folder_path: &str) {
+    if !folder_path.trim().is_empty() && Path::new(folder_path).exists() {
+        let _ = std::process::Command::new("explorer.exe")
+            .arg(folder_path)
+            .spawn();
+    }
+}
+
+fn reset_cancel(slot: &Mutex<Arc<AtomicBool>>) -> Arc<AtomicBool> {
+    let mut guard = slot.lock().unwrap();
+    guard.store(true, Ordering::Relaxed);
+    let fresh = Arc::new(AtomicBool::new(false));
+    *guard = Arc::clone(&fresh);
+    fresh
+}
+
+fn trigger_cancel(slot: &Mutex<Arc<AtomicBool>>) {
+    if let Ok(guard) = slot.lock() {
+        guard.store(true, Ordering::Relaxed);
+    }
+}
+
+fn get_str(root: &Value, keys: &[&str]) -> Option<String> {
+    for k in keys {
+        if let Some(s) = root.get(*k).and_then(|v| v.as_str()) {
+            return Some(s.to_string());
+        }
+    }
+    None
+}
+
+fn get_i64(root: &Value, keys: &[&str]) -> Option<i64> {
+    for k in keys {
+        if let Some(n) = root.get(*k).and_then(|v| v.as_i64()) {
+            return Some(n);
+        }
+    }
+    None
+}
+
+fn get_u64(root: &Value, keys: &[&str]) -> Option<u64> {
+    for k in keys {
+        if let Some(n) = root.get(*k).and_then(|v| v.as_u64()) {
+            return Some(n);
+        }
+    }
+    None
+}
+
+fn get_bool(root: &Value, keys: &[&str]) -> Option<bool> {
+    for k in keys {
+        if let Some(b) = root.get(*k).and_then(|v| v.as_bool()) {
+            return Some(b);
+        }
+    }
+    None
+}

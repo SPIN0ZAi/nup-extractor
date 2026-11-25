@@ -1,0 +1,125 @@
+{
+  "cases": [
+    {
+      "id": "corrupt_bad_extent_hash_deep_verify",
+      "operation": "verify_deep",
+      "threw": false,
+      "valid": true,
+      "problems": []
+    },
+    {
+      "id": "corrupt_bad_magic_inspect",
+      "operation": "inspect",
+      "threw": true,
+      "exceptionType": "InvalidDataException",
+      "message": "Invalid NUP magic bytes"
+    },
+    {
+      "id": "corrupt_bad_toc_hash_inspect",
+      "operation": "inspect",
+      "threw": true,
+      "exceptionType": "InvalidDataException",
+      "message": "TOC SHA-256 mismatch: container is corrupt or modified"
+    },
+    {
+      "id": "corrupt_bad_toc_magic_inspect",
+      "operation": "inspect",
+      "threw": true,
+      "exceptionType": "InvalidDataException",
+      "message": "Invalid TOC magic"
+    },
+    {
+      "id": "corrupt_blob_overlaps_toc_inspect",
+      "operation": "inspect",
+      "threw": true,
+      "exceptionType": "InvalidDataException",
+      "message": "Blob offset overlaps TOC"
+    },
+    {
+      "id": "corrupt_size_mismatch_inspect",
+      "operation": "inspect",
+      "threw": true,
+      "exceptionType": "InvalidDataException",
+      "message": "NUP file size mismatch: header 1473 != actual 1463"
+    },
+    {
+      "id": "corrupt_toc_before_header_inspect",
+      "operation": "inspect",
+      "threw": true,
+      "exceptionType": "InvalidDataException",
+      "message": "TOC offset is before header end"
+    },
+    {
+      "id": "corrupt_truncated_header_inspect",
+      "operation": "inspect",
+      "threw": true,
+      "exceptionType": "InvalidDataException",
+      "message": "File too small for NUP header: 64 bytes"
+    },
+    {
+      "id": "corrupt_unaligned_blob_inspect",
+      "operation": "inspect",
+      "threw": true,
+      "exceptionType": "InvalidDataException",
+      "message": "Blob offset is not 16-byte aligned"
+    },
+    {
+      "id": "corrupt_unknown_codec_deep_verify",
+      "operation": "verify_deep",
+      "threw": false,
+      "valid": false,
+      "problems": [
+        "File #0 (main): Failed to decompress/read: Unknown codec: 99"
+      ]
+    },
+    {
+      "id": "oob_dir_index",
+      "operation": "get_tree",
+      "threw": true,
+      "exceptionType": "ArgumentOutOfRangeException",
+      "message": "Specified argument was out of the range of valid values. (Parameter \u0027dirIndex\u0027)"
+    },
+    {
+      "id": "empty_nup_path",
+      "operation": "extract",
+      "threw": true,
+      "exceptionType": "ArgumentException",
+      "message": "NUP file path cannot be empty. (Parameter \u0027nupPath\u0027)"
+    },
+    {
+      "id": "empty_dest_path",
+      "operation": "extract",
+      "threw": true,
+      "exceptionType": "ArgumentException",
+      "message": "Destination folder cannot be empty. (Parameter \u0027destDir\u0027)"
+    },
+    {
+      "id": "missing_file_inspect",
+      "operation": "inspect",
+      "threw": true,
+      "exceptionType": "FileNotFoundException",
+      "message": "Could not find file \u0027C:\\Users\\hatim\\AppData\\Local\\Temp\\does_not_exist_nup_golden.nup\u0027."
+    },
+    {
+      "id": "invalid_package_index",
+      "operation": "extract",
+      "threw": true,
+      "exceptionType": "ArgumentException",
+      "message": "Invalid package index 99"
+    },
+    {
+      "id": "missing_subtree",
+      "operation": "extract",
+      "threw": true,
+      "exceptionType": "DirectoryNotFoundException",
+      "message": "Subtree path component \u0027does_not_exist\u0027 not found"
+    },
+    {
+      "id": "single_file_oob",
+      "operation": "extract_single_file",
+      "threw": true,
+      "exceptionType": "ArgumentOutOfRangeException",
+      "message": "Specified argument was out of the range of valid values. (Parameter \u0027fileIndex\u0027)"
+    }
+  ]
+}

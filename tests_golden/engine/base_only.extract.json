@@ -1,0 +1,173 @@
+{
+  "fixture": "base_only",
+  "modes": [
+    {
+      "label": "all",
+      "mode": "all",
+      "packageIndex": null,
+      "subtreePath": null,
+      "fileCount": 4,
+      "firstStatus": {
+        "status": "starting",
+        "current": 0,
+        "total": 4,
+        "percent": 0,
+        "fileName": "Initializing extraction...",
+        "bytesWritten": 0,
+        "totalBytes": 4664
+      },
+      "lastStatus": {
+        "status": "completed",
+        "current": 4,
+        "total": 4,
+        "percent": 100,
+        "fileName": "Done",
+        "bytesWritten": 4664,
+        "totalBytes": 4664
+      },
+      "files": [
+        {
+          "relPath": "exefs/main",
+          "size": 512,
+          "sha256": "25760451591d6ed2895e977e1c046b8b2543e84eb4ad2a3f1a870c6faf01f8a0"
+        },
+        {
+          "relPath": "exefs/main.npdm",
+          "size": 64,
+          "sha256": "76b3391ac90cbd8acaaf70b3618fe36edbba1ed94f311aa0b26a105c6daaeb6a"
+        },
+        {
+          "relPath": "romfs/levels/stage01.txt",
+          "size": 4080,
+          "sha256": "64cf1408c1877069a06974ad259da86f4111cb03bb222fa48f44571189212e73"
+        },
+        {
+          "relPath": "romfs/raw_blob.bin",
+          "size": 8,
+          "sha256": "0516bfb2fab718098d4d4e423a45ba30b111d845dd295a7760d8c7de122b31ab"
+        }
+      ]
+    },
+    {
+      "label": "package_0",
+      "mode": "package",
+      "packageIndex": 0,
+      "subtreePath": null,
+      "fileCount": 4,
+      "firstStatus": {
+        "status": "starting",
+        "current": 0,
+        "total": 4,
+        "percent": 0,
+        "fileName": "Initializing extraction...",
+        "bytesWritten": 0,
+        "totalBytes": 4664
+      },
+      "lastStatus": {
+        "status": "completed",
+        "current": 4,
+        "total": 4,
+        "percent": 100,
+        "fileName": "Done",
+        "bytesWritten": 4664,
+        "totalBytes": 4664
+      },
+      "files": [
+        {
+          "relPath": "exefs/main",
+          "size": 512,
+          "sha256": "25760451591d6ed2895e977e1c046b8b2543e84eb4ad2a3f1a870c6faf01f8a0"
+        },
+        {
+          "relPath": "exefs/main.npdm",
+          "size": 64,
+          "sha256": "76b3391ac90cbd8acaaf70b3618fe36edbba1ed94f311aa0b26a105c6daaeb6a"
+        },
+        {
+          "relPath": "romfs/levels/stage01.txt",
+          "size": 4080,
+          "sha256": "64cf1408c1877069a06974ad259da86f4111cb03bb222fa48f44571189212e73"
+        },
+        {
+          "relPath": "romfs/raw_blob.bin",
+          "size": 8,
+          "sha256": "0516bfb2fab718098d4d4e423a45ba30b111d845dd295a7760d8c7de122b31ab"
+        }
+      ]
+    },
+    {
+      "label": "subtree_pkg0_romfs",
+      "mode": "subtree",
+      "packageIndex": 0,
+      "subtreePath": "romfs",
+      "fileCount": 2,
+      "firstStatus": {
+        "status": "starting",
+        "current": 0,
+        "total": 2,
+        "percent": 0,
+        "fileName": "Initializing extraction...",
+        "bytesWritten": 0,
+        "totalBytes": 4088
+      },
+      "lastStatus": {
+        "status": "completed",
+        "current": 2,
+        "total": 2,
+        "percent": 100,
+        "fileName": "Done",
+        "bytesWritten": 4088,
+        "totalBytes": 4088
+      },
+      "files": [
+        {
+          "relPath": "levels/stage01.txt",
+          "size": 4080,
+          "sha256": "64cf1408c1877069a06974ad259da86f4111cb03bb222fa48f44571189212e73"
+        },
+        {
+          "relPath": "raw_blob.bin",
+          "size": 8,
+          "sha256": "0516bfb2fab718098d4d4e423a45ba30b111d845dd295a7760d8c7de122b31ab"
+        }
+      ]
+    },
+    {
+      "label": "subtree_pkg0_exefs",
+      "mode": "subtree",
+      "packageIndex": 0,
+      "subtreePath": "exefs",
+      "fileCount": 2,
+      "firstStatus": {
+        "status": "starting",
+        "current": 0,
+        "total": 2,
+        "percent": 0,
+        "fileName": "Initializing extraction...",
+        "bytesWritten": 0,
+        "totalBytes": 576
+      },
+      "lastStatus": {
+        "status": "completed",
+        "current": 2,
+        "total": 2,
+        "percent": 100,
+        "fileName": "Done",
+        "bytesWritten": 576,
+        "totalBytes": 576
+      },
+      "files": [
+        {
+          "relPath": "main",
+          "size": 512,
+          "sha256": "25760451591d6ed2895e977e1c046b8b2543e84eb4ad2a3f1a870c6faf01f8a0"
+        },
+        {
+          "relPath": "main.npdm",
+          "size": 64,
+          "sha256": "76b3391ac90cbd8acaaf70b3618fe36edbba1ed94f311aa0b26a105c6daaeb6a"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,260 @@
+{
+  "fixture": "edge_cases",
+  "dirCount": 13,
+  "dirs": [
+    {
+      "type": "dir",
+      "index": 0,
+      "name": "root",
+      "children": [
+        {
+          "type": "dir",
+          "index": 1,
+          "name": "romfs",
+          "child_count": 5,
+          "childCount": 5,
+          "has_children": true,
+          "hasChildren": true
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 1,
+      "name": "romfs",
+      "children": [
+        {
+          "type": "dir",
+          "index": 2,
+          "name": "empty_folder",
+          "child_count": 0,
+          "childCount": 0,
+          "has_children": false,
+          "hasChildren": false
+        },
+        {
+          "type": "dir",
+          "index": 3,
+          "name": "lvl01",
+          "child_count": 1,
+          "childCount": 1,
+          "has_children": true,
+          "hasChildren": true
+        },
+        {
+          "type": "file",
+          "index": 1,
+          "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_long_name_test.bin",
+          "size": 360,
+          "size_formatted": "360 B",
+          "sizeFormatted": "360 B",
+          "extent_size": 34,
+          "extentSize": 34,
+          "extent_size_formatted": "34 B",
+          "extentSizeFormatted": "34 B",
+          "codec": "zstd",
+          "sha256": "be784fc87d39ce58d76553a10d553f3688de4eb43466d9ffa4f69118d26d15b2"
+        },
+        {
+          "type": "file",
+          "index": 2,
+          "name": "empty_zero_bytes.dat",
+          "size": 0,
+          "size_formatted": "0 B",
+          "sizeFormatted": "0 B",
+          "extent_size": 0,
+          "extentSize": 0,
+          "extent_size_formatted": "0 B",
+          "extentSizeFormatted": "0 B",
+          "codec": "raw",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "type": "file",
+          "index": 3,
+          "name": "\u65E5\u672C\u8A9E_caf\u00E9.txt",
+          "size": 46,
+          "size_formatted": "46 B",
+          "sizeFormatted": "46 B",
+          "extent_size": 46,
+          "extentSize": 46,
+          "extent_size_formatted": "46 B",
+          "extentSizeFormatted": "46 B",
+          "codec": "raw",
+          "sha256": "10a8b1d95550734215f504a72c9bcdfa8b16a45e3cb9a564e0bcba86a3c9790c"
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 2,
+      "name": "empty_folder",
+      "children": []
+    },
+    {
+      "type": "dir",
+      "index": 3,
+      "name": "lvl01",
+      "children": [
+        {
+          "type": "dir",
+          "index": 4,
+          "name": "lvl02",
+          "child_count": 1,
+          "childCount": 1,
+          "has_children": true,
+          "hasChildren": true
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 4,
+      "name": "lvl02",
+      "children": [
+        {
+          "type": "dir",
+          "index": 5,
+          "name": "lvl03",
+          "child_count": 1,
+          "childCount": 1,
+          "has_children": true,
+          "hasChildren": true
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 5,
+      "name": "lvl03",
+      "children": [
+        {
+          "type": "dir",
+          "index": 6,
+          "name": "lvl04",
+          "child_count": 1,
+          "childCount": 1,
+          "has_children": true,
+          "hasChildren": true
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 6,
+      "name": "lvl04",
+      "children": [
+        {
+          "type": "dir",
+          "index": 7,
+          "name": "lvl05",
+          "child_count": 1,
+          "childCount": 1,
+          "has_children": true,
+          "hasChildren": true
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 7,
+      "name": "lvl05",
+      "children": [
+        {
+          "type": "dir",
+          "index": 8,
+          "name": "lvl06",
+          "child_count": 1,
+          "childCount": 1,
+          "has_children": true,
+          "hasChildren": true
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 8,
+      "name": "lvl06",
+      "children": [
+        {
+          "type": "dir",
+          "index": 9,
+          "name": "lvl07",
+          "child_count": 1,
+          "childCount": 1,
+          "has_children": true,
+          "hasChildren": true
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 9,
+      "name": "lvl07",
+      "children": [
+        {
+          "type": "dir",
+          "index": 10,
+          "name": "lvl08",
+          "child_count": 1,
+          "childCount": 1,
+          "has_children": true,
+          "hasChildren": true
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 10,
+      "name": "lvl08",
+      "children": [
+        {
+          "type": "dir",
+          "index": 11,
+          "name": "lvl09",
+          "child_count": 1,
+          "childCount": 1,
+          "has_children": true,
+          "hasChildren": true
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 11,
+      "name": "lvl09",
+      "children": [
+        {
+          "type": "dir",
+          "index": 12,
+          "name": "lvl10",
+          "child_count": 1,
+          "childCount": 1,
+          "has_children": true,
+          "hasChildren": true
+        }
+      ]
+    },
+    {
+      "type": "dir",
+      "index": 12,
+      "name": "lvl10",
+      "children": [
+        {
+          "type": "file",
+          "index": 0,
+          "name": "deep_leaf.txt",
+          "size": 17,
+          "size_formatted": "17 B",
+          "sizeFormatted": "17 B",
+          "extent_size": 17,
+          "extentSize": 17,
+          "extent_size_formatted": "17 B",
+          "extentSizeFormatted": "17 B",
+          "codec": "raw",
+          "sha256": "b78d8ad1224d10a38ff5a883c059ef137d1072c7bf0dffbb9617c8adcd7128a0"
+        }
+      ]
+    }
+  ]
+}

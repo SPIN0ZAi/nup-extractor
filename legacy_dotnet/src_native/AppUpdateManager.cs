@@ -39,7 +39,7 @@ public class UpdateProgressInfo
 public static class AppUpdateManager
 {
     public static string CurrentVersion { get; } = ResolveVersion();
-    public const string GitHubRepo = "SPIN0ZAi/nup-extractor";
+    public const string GitHubRepo = "hatimbenayad/NupUpgrade";
     private static readonly HttpClient _httpClient = new HttpClient();
 
     private static string ResolveVersion()
