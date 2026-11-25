@@ -3,7 +3,7 @@
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use nup_core::format_bytes;
@@ -221,13 +221,29 @@ pub fn download_and_stage_update<F>(
 where
     F: FnMut(UpdateProgressInfo),
 {
+    if cancel.load(Ordering::Relaxed) {
+        return Err("Update cancelled by user.".into());
+    }
+
+    // Fail closed: require an accompanying SHA256SUMS.txt URL before downloading or staging.
+    let sums_url = checksum_url
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| {
+            "Update verification failed: release does not provide SHA256SUMS.txt.".to_string()
+        })?;
+
+    static TEMP_DIR_SEQ: AtomicU64 = AtomicU64::new(0);
+    let seq = TEMP_DIR_SEQ.fetch_add(1, Ordering::Relaxed);
     let client = build_http_client()?;
     let temp_base = std::env::temp_dir().join(format!(
-        "NupExtractor_Update_{}",
+        "NupExtractor_Update_{}_{}_{}",
+        std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_nanos())
-            .unwrap_or(0)
+            .unwrap_or(0),
+        seq,
     ));
     fs::create_dir_all(&temp_base).map_err(|e| e.to_string())?;
     let zip_path = temp_base.join("update.zip");
@@ -318,33 +334,31 @@ where
             let _ = write!(&mut actual_hex, "{b:02x}");
         }
 
-        // DIV-004: Verify SHA-256 against SHA256SUMS.txt if present
-        if let Some(sums_url) = checksum_url {
-            progress(UpdateProgressInfo {
-                stage: "verifying".into(),
-                percent: 100.0,
-                bytes_downloaded: total_downloaded,
-                total_bytes: total_downloaded,
-                speed_formatted: String::new(),
-                message: "Verifying SHA-256 checksum...".into(),
-                error: None,
-            });
-            let sums_resp = client.get(sums_url).send().map_err(|e| e.to_string())?;
-            if !sums_resp.status().is_success() {
-                return Err(format!(
-                    "Failed to fetch SHA256SUMS.txt (HTTP {})",
-                    sums_resp.status()
-                ));
-            }
-            let sums_text = sums_resp.text().map_err(|e| e.to_string())?;
-            let asset_name = download_url.rsplit('/').next().unwrap_or("");
-            let expected_hex = parse_sha256_sums(&sums_text, asset_name)
-                .ok_or_else(|| format!("Asset '{asset_name}' not found in SHA256SUMS.txt"))?;
-            if actual_hex != expected_hex {
-                return Err(format!(
-                    "SHA-256 checksum mismatch for update archive (expected {expected_hex}, got {actual_hex})"
-                ));
-            }
+        // Verify SHA-256 against SHA256SUMS.txt (mandatory; fail closed).
+        progress(UpdateProgressInfo {
+            stage: "verifying".into(),
+            percent: 100.0,
+            bytes_downloaded: total_downloaded,
+            total_bytes: total_downloaded,
+            speed_formatted: String::new(),
+            message: "Verifying SHA-256 checksum...".into(),
+            error: None,
+        });
+        let sums_resp = client.get(sums_url).send().map_err(|e| e.to_string())?;
+        if !sums_resp.status().is_success() {
+            return Err(format!(
+                "Failed to fetch SHA256SUMS.txt (HTTP {})",
+                sums_resp.status()
+            ));
+        }
+        let sums_text = sums_resp.text().map_err(|e| e.to_string())?;
+        let asset_name = download_url.rsplit('/').next().unwrap_or("");
+        let expected_hex = parse_sha256_sums(&sums_text, asset_name)
+            .ok_or_else(|| format!("Asset '{asset_name}' not found in SHA256SUMS.txt"))?;
+        if actual_hex != expected_hex {
+            return Err(format!(
+                "SHA-256 checksum mismatch for update archive (expected {expected_hex}, got {actual_hex})"
+            ));
         }
 
         // Extract archive safely
@@ -678,11 +692,33 @@ mod tests {
         let cancel = AtomicBool::new(true);
         let err = download_and_stage_update(
             &format!("{base}/assets/NUP_Extractor-v9.9.9-windows-x64.zip"),
-            None,
+            Some(&format!("{base}/assets/SHA256SUMS.txt")),
             |_| {},
             &cancel,
         )
         .unwrap_err();
         assert!(err.contains("cancelled"), "got: {err}");
+    }
+
+    #[test]
+    fn test_mock_update_rejects_missing_checksum_url() {
+        let cancel = AtomicBool::new(false);
+        let err = download_and_stage_update(
+            "http://127.0.0.1:9/assets/NUP_Extractor-v9.9.9-windows-x64.zip",
+            None,
+            |_| {},
+            &cancel,
+        )
+        .unwrap_err();
+        assert!(err.contains("SHA256SUMS.txt"), "got: {err}");
+
+        let err_empty = download_and_stage_update(
+            "http://127.0.0.1:9/assets/NUP_Extractor-v9.9.9-windows-x64.zip",
+            Some("   "),
+            |_| {},
+            &cancel,
+        )
+        .unwrap_err();
+        assert!(err_empty.contains("SHA256SUMS.txt"), "got: {err_empty}");
     }
 }

@@ -262,6 +262,14 @@ function setupEventListeners() {
     btnOpenFile.addEventListener("click", browseNativeFile);
     btnDropzoneBrowse.addEventListener("click", browseNativeFile);
 
+    // Copy buttons (wired without inline onclick attributes to satisfy strict CSP)
+    document.querySelectorAll(".copy-btn[data-copy-target]").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const targetId = btn.getAttribute("data-copy-target");
+            if (targetId) copyText(targetId);
+        });
+    });
+
     // Sample buttons
     btnDropzoneSample.addEventListener("click", () => loadNup("sample_game.nup"));
     btnLoadSample.addEventListener("click", () => loadNup("sample_game.nup"));
@@ -696,12 +704,19 @@ async function refreshShellStatus() {
         const res = await nativeCall("get_shell_integration_status");
         isShellRegistered = !!(res && res.registered);
         if (isShellRegistered) {
-            shellStatusIndicator.innerHTML = 'Status: <span style="color: var(--switch-green); font-weight: 700;">Active in Windows Explorer</span>';
+            const statusSpan = document.createElement("span");
+            statusSpan.style.color = "var(--switch-green)";
+            statusSpan.style.fontWeight = "700";
+            statusSpan.textContent = "Active in Windows Explorer";
+            shellStatusIndicator.replaceChildren(document.createTextNode("Status: "), statusSpan);
             btnToggleShellIntegration.textContent = "Remove from Explorer";
             btnToggleShellIntegration.className = "btn btn-ghost";
             btnToggleShellIntegration.style.color = "var(--switch-red)";
         } else {
-            shellStatusIndicator.innerHTML = 'Status: <span style="color: var(--text-muted);">Not Registered</span>';
+            const statusSpan = document.createElement("span");
+            statusSpan.style.color = "var(--text-muted)";
+            statusSpan.textContent = "Not Registered";
+            shellStatusIndicator.replaceChildren(document.createTextNode("Status: "), statusSpan);
             btnToggleShellIntegration.textContent = "Enable Integration";
             btnToggleShellIntegration.className = "btn btn-cyan";
             btnToggleShellIntegration.style.color = "";
@@ -766,7 +781,7 @@ function clearPackForm(opts = {}) {
     if (packDropzoneTitle) packDropzoneTitle.textContent = "Drop Game Folder Here";
 
     const packSourceDetected = document.getElementById("pack-source-detected");
-    if (packSourceDetected) packSourceDetected.innerHTML = "";
+    if (packSourceDetected) packSourceDetected.replaceChildren();
 
     if (packTitleInput) packTitleInput.value = "";
     if (packPublisherInput) packPublisherInput.value = "";
@@ -828,7 +843,7 @@ function setPackSourceFolder(folderPath, folderName, opts = {}) {
     }
 
     const packSourceDetected = document.getElementById("pack-source-detected");
-    if (packSourceDetected) packSourceDetected.innerHTML = "";
+    if (packSourceDetected) packSourceDetected.replaceChildren();
 
     const reqSeq = ++packInspectSeq;
     if (isNative) {
@@ -873,7 +888,7 @@ function setPackSourceFolder(folderPath, folderName, opts = {}) {
                 }
 
                 if (packSourceDetected) {
-                    packSourceDetected.innerHTML = "";
+                    packSourceDetected.replaceChildren();
                     res.packages.forEach(p => {
                         const pill = document.createElement("span");
                         pill.className = "badge-tag";
@@ -955,7 +970,7 @@ async function startPackaging() {
     if (packCurrentFile) packCurrentFile.textContent = "Scanning directory structure...";
     if (packStatsFiles) packStatsFiles.textContent = "0 / 0 files";
     if (packStatsBytes) packStatsBytes.textContent = "0 B / 0 B";
-    if (packLogBox) packLogBox.innerHTML = "";
+    if (packLogBox) packLogBox.replaceChildren();
     if (btnPackModalOpenFolder) btnPackModalOpenFolder.style.display = "none";
     if (btnPackModalClose) btnPackModalClose.style.display = "none";
     if (btnPackCollapseBg) btnPackCollapseBg.style.display = "inline-flex";
@@ -1181,11 +1196,14 @@ function renderContainer() {
     gameFilesizeEl.textContent = fileSizeFormatted;
     badgeVersionEl.textContent = `v${dispVer}`;
 
-    if (icon && icon.length > 0) {
+    const isSafeIconDataUri = typeof icon === "string"
+        && (icon.startsWith("data:image/png;base64,") || icon.startsWith("data:image/jpeg;base64,"));
+    if (isSafeIconDataUri) {
         gameIconEl.src = icon;
         gameIconEl.style.display = "block";
         gameIconFallbackEl.style.display = "none";
     } else {
+        gameIconEl.removeAttribute("src");
         gameIconEl.style.display = "none";
         gameIconFallbackEl.style.display = "block";
     }
@@ -1219,35 +1237,103 @@ function renderContainer() {
     renderTree();
 }
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function createSvgIcon(attrs, childrenSpecs) {
+    const svg = document.createElementNS(SVG_NS, "svg");
+    Object.entries(attrs).forEach(([k, v]) => svg.setAttribute(k, String(v)));
+    childrenSpecs.forEach(([tag, childAttrs]) => {
+        const el = document.createElementNS(SVG_NS, tag);
+        Object.entries(childAttrs).forEach(([k, v]) => el.setAttribute(k, String(v)));
+        svg.appendChild(el);
+    });
+    return svg;
+}
+
+function createPackageKindIcon(kind) {
+    const baseAttrs = { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": 2 };
+    if (kind === 0) {
+        return createSvgIcon(baseAttrs, [["rect", { x: 2, y: 6, width: 20, height: 12, rx: 2 }]]);
+    }
+    if (kind === 1) {
+        return createSvgIcon(baseAttrs, [["path", { d: "M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" }]]);
+    }
+    return createSvgIcon(baseAttrs, [["path", { d: "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" }]]);
+}
+
+function appendTreeIndents(rowEl, depth) {
+    for (let i = 0; i < depth; i++) {
+        const indent = document.createElement("span");
+        indent.className = "node-indent";
+        rowEl.appendChild(indent);
+    }
+}
+
+function buildFileRowContent(rowEl, file, depth) {
+    const codecText = String(file.codec || "raw");
+    const codecClass = codecText === "zstd" ? "codec-zstd" : "codec-raw";
+    const sizeFormatted = file.size_formatted || file.sizeFormatted || formatBytes(file.size);
+
+    appendTreeIndents(rowEl, depth);
+
+    if (depth >= 0 && arguments[3]) {
+        const spacer = document.createElement("span");
+        spacer.style.width = "12px";
+        rowEl.appendChild(spacer);
+    }
+
+    rowEl.appendChild(createSvgIcon(
+        { class: "node-icon", viewBox: "0 0 24 24", fill: "none", stroke: "var(--text-muted)", "stroke-width": 2 },
+        [
+            ["path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }],
+            ["polyline", { points: "14 2 14 8 20 8" }]
+        ]
+    ));
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "node-name";
+    nameSpan.textContent = String(file.name ?? "");
+    rowEl.appendChild(nameSpan);
+
+    const metaDiv = document.createElement("div");
+    metaDiv.className = "node-meta";
+
+    const codecSpan = document.createElement("span");
+    codecSpan.className = `codec-pill ${codecClass}`;
+    codecSpan.textContent = codecText;
+
+    const sizeSpan = document.createElement("span");
+    sizeSpan.textContent = String(sizeFormatted);
+
+    metaDiv.append(codecSpan, sizeSpan);
+    rowEl.appendChild(metaDiv);
+}
+
 // Render Package Tabs
 function renderTabs() {
-    tabsContainer.innerHTML = "";
+    tabsContainer.replaceChildren();
     const packages = currentContainer.packages || [];
 
     packages.forEach((pkg, idx) => {
         const btn = document.createElement("button");
         btn.className = `tab-btn ${idx === activePackageIndex ? "active" : ""}`;
-        
-        let iconSvg = "";
+
         let kindClass = "tab-badge";
         const kind = pkg.kind ?? 0;
-        const kindName = pkg.kind_name || pkg.kindName || "base";
-        const fileCount = pkg.file_count ?? pkg.fileCount ?? 0;
-
+        const kindName = String(pkg.kind_name || pkg.kindName || "base");
+        const fileCount = Number(pkg.file_count ?? pkg.fileCount ?? 0);
         if (kind === 0) {
             kindClass += " codec-zstd";
-            iconSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"></rect></svg>`;
-        } else if (kind === 1) {
-            iconSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>`;
-        } else {
-            iconSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>`;
         }
 
-        btn.innerHTML = `
-            ${iconSvg}
-            <span>${kindName.toUpperCase()}</span>
-            <span class="${kindClass}">${fileCount} files</span>
-        `;
+        const kindSpan = document.createElement("span");
+        kindSpan.textContent = kindName.toUpperCase();
+
+        const countSpan = document.createElement("span");
+        countSpan.className = kindClass;
+        countSpan.textContent = `${fileCount} files`;
+
+        btn.append(createPackageKindIcon(kind), kindSpan, countSpan);
 
         btn.addEventListener("click", () => {
             activePackageIndex = idx;
@@ -1275,7 +1361,7 @@ function updateCurrentPkgMeta() {
 }
 
 function populateSubtreeOptions() {
-    subtreeSelect.innerHTML = "";
+    subtreeSelect.replaceChildren();
     const packages = currentContainer.packages || [];
     const pkg = packages[activePackageIndex];
     if (!pkg) return;
@@ -1297,6 +1383,15 @@ function populateSubtreeOptions() {
     }
 }
 
+function renderTreeStatusMessage(text, colorVar = "var(--text-muted)", centered = false) {
+    const msg = document.createElement("div");
+    msg.style.color = colorVar;
+    msg.style.padding = "1rem";
+    if (centered) msg.style.textAlign = "center";
+    msg.textContent = text;
+    treeViewEl.replaceChildren(msg);
+}
+
 // Render File Tree
 async function renderTree() {
     updateCurrentPkgMeta();
@@ -1304,16 +1399,16 @@ async function renderTree() {
     const pkg = packages[activePackageIndex];
     if (!pkg) return;
 
-    treeViewEl.innerHTML = `<div style="color: var(--text-muted); padding: 1rem; text-align: center;">Loading folder structure...</div>`;
+    renderTreeStatusMessage("Loading folder structure...", "var(--text-muted)", true);
 
     const rootDirIndex = pkg.root_dir_index ?? pkg.rootDirIndex ?? 0;
     const rootData = await fetchDirChildren(rootDirIndex);
 
-    treeViewEl.innerHTML = "";
+    treeViewEl.replaceChildren();
     expandedDirs.add(rootDirIndex);
 
     if (!rootData || !rootData.children || rootData.children.length === 0) {
-        treeViewEl.innerHTML = `<div style="color: var(--text-muted); padding: 1rem;">No files found in this package.</div>`;
+        renderTreeStatusMessage("No files found in this package.");
         return;
     }
 
@@ -1328,25 +1423,35 @@ function renderTreeNodes(children, parentEl, depth = 0) {
         const rowEl = document.createElement("div");
         rowEl.className = "node-row";
 
-        let indentHtml = "";
-        for (let i = 0; i < depth; i++) {
-            indentHtml += `<span class="node-indent"></span>`;
-        }
-
         if (node.type === "dir") {
             const isExpanded = expandedDirs.has(node.index);
-            const chevron = isExpanded
-                ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>`
-                : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
+            const childCount = Number(node.child_count ?? node.childCount ?? 0);
 
-            const childCount = node.child_count ?? node.childCount ?? 0;
-            rowEl.innerHTML = `
-                ${indentHtml}
-                <span style="color: var(--text-muted);">${chevron}</span>
-                <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="var(--switch-blue)" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                <span class="node-name" style="font-weight: 600;">${node.name || "root"}</span>
-                <span class="node-meta">${childCount} items</span>
-            `;
+            appendTreeIndents(rowEl, depth);
+
+            const chevronWrap = document.createElement("span");
+            chevronWrap.style.color = "var(--text-muted)";
+            chevronWrap.appendChild(createSvgIcon(
+                { width: 12, height: 12, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "stroke-width": 2.5 },
+                [["polyline", { points: isExpanded ? "6 9 12 15 18 9" : "9 18 15 12 9 6" }]]
+            ));
+            rowEl.appendChild(chevronWrap);
+
+            rowEl.appendChild(createSvgIcon(
+                { class: "node-icon", viewBox: "0 0 24 24", fill: "none", stroke: "var(--switch-blue)", "stroke-width": 2 },
+                [["path", { d: "M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" }]]
+            ));
+
+            const nameSpan = document.createElement("span");
+            nameSpan.className = "node-name";
+            nameSpan.style.fontWeight = "600";
+            nameSpan.textContent = node.name || "root";
+
+            const metaSpan = document.createElement("span");
+            metaSpan.className = "node-meta";
+            metaSpan.textContent = `${childCount} items`;
+
+            rowEl.append(nameSpan, metaSpan);
 
             const subContainer = document.createElement("div");
             subContainer.style.display = isExpanded ? "block" : "none";
@@ -1359,7 +1464,7 @@ function renderTreeNodes(children, parentEl, depth = 0) {
                 } else {
                     expandedDirs.add(node.index);
                     const subData = await fetchDirChildren(node.index);
-                    subContainer.innerHTML = "";
+                    subContainer.replaceChildren();
                     renderTreeNodes(subData.children, subContainer, depth + 1);
                     subContainer.style.display = "block";
                     renderTree();
@@ -1374,18 +1479,7 @@ function renderTreeNodes(children, parentEl, depth = 0) {
             }
 
         } else {
-            const codecClass = node.codec === "zstd" ? "codec-zstd" : "codec-raw";
-            const sizeFormatted = node.size_formatted || node.sizeFormatted || formatBytes(node.size);
-            rowEl.innerHTML = `
-                ${indentHtml}
-                <span style="width: 12px;"></span>
-                <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-                <span class="node-name">${node.name}</span>
-                <div class="node-meta">
-                    <span class="codec-pill ${codecClass}">${node.codec}</span>
-                    <span>${sizeFormatted}</span>
-                </div>
-            `;
+            buildFileRowContent(rowEl, node, depth, true);
             rowEl.addEventListener("contextmenu", (e) => {
                 e.preventDefault();
                 showContextMenu(e.clientX, e.clientY, {
@@ -1441,7 +1535,7 @@ function handleSearch(e) {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(async () => {
         isSearching = true;
-        treeViewEl.innerHTML = `<div style="color: var(--text-muted); padding: 1rem; text-align: center;">Searching...</div>`;
+        renderTreeStatusMessage("Searching...", "var(--text-muted)", true);
         const filePath = currentContainer.file_path || currentContainer.filePath;
         try {
             let results;
@@ -1455,15 +1549,15 @@ function handleSearch(e) {
             }
             renderSearchResults(results, q);
         } catch (e) {
-            treeViewEl.innerHTML = `<div style="color: var(--switch-red); padding: 1rem;">Search failed: ${e.message}</div>`;
+            renderTreeStatusMessage(`Search failed: ${e.message}`, "var(--switch-red)");
         }
     }, 200);
 }
 
 function renderSearchResults(results, q) {
-    treeViewEl.innerHTML = "";
+    treeViewEl.replaceChildren();
     if (!results || results.length === 0) {
-        treeViewEl.innerHTML = `<div style="color: var(--text-muted); padding: 1rem;">No files matching "${q}"</div>`;
+        renderTreeStatusMessage(`No files matching "${q}"`);
         return;
     }
 
@@ -1477,16 +1571,7 @@ function renderSearchResults(results, q) {
     results.forEach(file => {
         const row = document.createElement("div");
         row.className = "node-row";
-        const codecClass = file.codec === "zstd" ? "codec-zstd" : "codec-raw";
-        const sizeFormatted = file.size_formatted || file.sizeFormatted || formatBytes(file.size);
-        row.innerHTML = `
-            <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-            <span class="node-name">${file.name}</span>
-            <div class="node-meta">
-                <span class="codec-pill ${codecClass}">${file.codec}</span>
-                <span>${sizeFormatted}</span>
-            </div>
-        `;
+        buildFileRowContent(row, file, 0, false);
         row.addEventListener("contextmenu", (e) => {
             e.preventDefault();
             showContextMenu(e.clientX, e.clientY, {
@@ -1534,7 +1619,7 @@ function startBatchExtraction(files) {
     extractStatsFiles.textContent = `Preparing extraction (0/${list.length})...`;
     extractStatsBytes.textContent = "0 B / 0 B";
     extractCurrentFile.textContent = "Starting high-speed extraction...";
-    extractLogBox.innerHTML = "";
+    extractLogBox.replaceChildren();
     if (btnExtractCollapseBg) btnExtractCollapseBg.style.display = "inline-flex";
     if (btnExtractCancel) btnExtractCancel.style.display = "inline-flex";
     btnModalOpenFolder.style.display = "none";
@@ -1705,7 +1790,7 @@ async function executeExtraction(nupPath, dest, mode, openWhenDone) {
     extractStatsFiles.textContent = "Initializing extraction...";
     extractStatsBytes.textContent = "0 B / 0 B";
     extractCurrentFile.textContent = "Starting high-speed extraction...";
-    extractLogBox.innerHTML = "";
+    extractLogBox.replaceChildren();
     if (btnExtractCollapseBg) btnExtractCollapseBg.style.display = "inline-flex";
     if (btnExtractCancel) btnExtractCancel.style.display = "inline-flex";
     btnModalOpenFolder.style.display = "none";
@@ -1849,7 +1934,7 @@ async function startVerification() {
     verifyModalPct.textContent = "0%";
     verifyProgressBar.style.width = "0%";
     verifyStatusText.textContent = "Validating Superblock, TOC integrity, and file SHA-256 checksums...";
-    verifyResultBox.innerHTML = "";
+    verifyResultBox.replaceChildren();
     verifyModal.classList.add("active");
 
     const filePath = currentContainer.file_path || currentContainer.filePath;
@@ -2184,9 +2269,7 @@ if (btnUpdateNow) {
         btnUpdateCancel.textContent = "Cancel";
 
         hostBridge.postMessage({
-            action: "start_update",
-            downloadUrl: pendingUpdateData.downloadUrl,
-            checksumUrl: pendingUpdateData.checksumUrl || null
+            action: "start_update"
         });
     });
 }
