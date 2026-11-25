@@ -3,6 +3,13 @@ name: Build & Release NUP Extractor
 on:
   push:
     branches: [ "main" ]
+    paths-ignore:
+      - 'website/**'
+      - 'pictures/**'
+      - 'docs/**'
+      - 'README.md'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
+      - '.github/workflows/deploy-pages.yml'
     tags: [ "v*" ]
   workflow_dispatch:
 

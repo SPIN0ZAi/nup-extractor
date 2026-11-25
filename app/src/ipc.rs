@@ -545,21 +545,29 @@ impl IpcRouter {
 
             "inspect_pack_source" => {
                 let src = get_str(&root, &["sourceDir", "source_dir"]).unwrap_or_default();
-                if !src.trim().is_empty() && Path::new(&src).is_dir() {
-                    let pkgs = detect_package_summary(&src);
-                    self.sink.send_json(json!({
-                        "id": id,
-                        "action": "inspect_pack_source_result",
-                        "success": true,
-                        "packages": pkgs
-                    }));
+                let sink = Arc::clone(&self.sink);
+                let run = move || {
+                    if !src.trim().is_empty() && Path::new(&src).is_dir() {
+                        let pkgs = detect_package_summary(&src);
+                        sink.send_json(json!({
+                            "id": id,
+                            "action": "inspect_pack_source_result",
+                            "success": true,
+                            "packages": pkgs
+                        }));
+                    } else {
+                        sink.send_json(json!({
+                            "id": id,
+                            "action": "inspect_pack_source_result",
+                            "success": false,
+                            "packages": []
+                        }));
+                    }
+                };
+                if spawn_bg {
+                    std::thread::spawn(run);
                 } else {
-                    self.sink.send_json(json!({
-                        "id": id,
-                        "action": "inspect_pack_source_result",
-                        "success": false,
-                        "packages": []
-                    }));
+                    run();
                 }
             }
 
