@@ -12,6 +12,7 @@ use nup_core::{
 use nup_host_logic::{OrbLaunchMode, OrbSettings, OrbSettingsStore, ScreenEdge};
 use serde_json::{Value, json};
 
+use crate::assets;
 use crate::backdrop::SystemAppearanceState;
 use crate::shell_integration;
 use crate::updater;
@@ -206,7 +207,9 @@ impl IpcRouter {
                 });
             }
             "extract_single_file" => {
-                let nup_path = get_str(&root, &["filePath", "file_path"]).unwrap_or_default();
+                let nup_path = assets::resolve_sample_nup_path(
+                    &get_str(&root, &["filePath", "file_path"]).unwrap_or_default(),
+                );
                 let file_index = get_i64(&root, &["fileIndex", "file_index"]).unwrap_or(-1);
                 let suggested_name = get_str(&root, &["fileName", "file_name", "name"])
                     .unwrap_or_else(|| "extracted_file".to_string());
@@ -239,7 +242,8 @@ impl IpcRouter {
                 }));
             }
             "inspect" => {
-                let file_path = get_str(&root, &["filePath", "file_path", "path"]);
+                let file_path = get_str(&root, &["filePath", "file_path", "path"])
+                    .map(|p| assets::resolve_sample_nup_path(&p));
                 let sink = Arc::clone(&self.sink);
                 let run = move || match file_path {
                     Some(fp) if !fp.trim().is_empty() => match inspect(&fp) {
@@ -270,7 +274,8 @@ impl IpcRouter {
                 }
             }
             "get_tree" => {
-                let file_path = get_str(&root, &["filePath", "file_path"]);
+                let file_path = get_str(&root, &["filePath", "file_path"])
+                    .map(|p| assets::resolve_sample_nup_path(&p));
                 let dir_index = get_i64(&root, &["dirIndex", "dir_index"]).unwrap_or(0) as u32;
                 let sink = Arc::clone(&self.sink);
                 let run = move || match file_path {
@@ -302,7 +307,8 @@ impl IpcRouter {
                 }
             }
             "search" => {
-                let file_path = get_str(&root, &["filePath", "file_path"]);
+                let file_path = get_str(&root, &["filePath", "file_path"])
+                    .map(|p| assets::resolve_sample_nup_path(&p));
                 let query = get_str(&root, &["query", "q"]).unwrap_or_default();
                 let sink = Arc::clone(&self.sink);
                 let run = move || match file_path {
@@ -335,7 +341,9 @@ impl IpcRouter {
                 }
             }
             "extract" => {
-                let file_path = get_str(&root, &["filePath", "file_path"]).unwrap_or_default();
+                let file_path = assets::resolve_sample_nup_path(
+                    &get_str(&root, &["filePath", "file_path"]).unwrap_or_default(),
+                );
                 let dest_dir = get_str(&root, &["destDir", "dest_dir"]).unwrap_or_default();
                 let mode = get_str(&root, &["mode"]).unwrap_or_else(|| "all".to_string());
                 let pkg_idx =
@@ -425,7 +433,9 @@ impl IpcRouter {
             "cancel_extract" => trigger_cancel(&self.extract_cancel),
 
             "verify" => {
-                let file_path = get_str(&root, &["filePath", "file_path"]).unwrap_or_default();
+                let file_path = assets::resolve_sample_nup_path(
+                    &get_str(&root, &["filePath", "file_path"]).unwrap_or_default(),
+                );
                 let deep = get_bool(&root, &["deep"]).unwrap_or(true);
                 if file_path.trim().is_empty() || !Path::new(&file_path).exists() {
                     self.sink.send_json(json!({

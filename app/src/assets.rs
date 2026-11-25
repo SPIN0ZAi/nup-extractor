@@ -8,6 +8,7 @@ const STYLES_CSS: &[u8] = include_bytes!("../../static/styles.css");
 const IPC_JS: &[u8] = include_bytes!("../../static/ipc.js");
 const APP_JS: &[u8] = include_bytes!("../../static/app.js");
 const APP_ICON_ICO: &[u8] = include_bytes!("../../app_icon.ico");
+const SAMPLE_GAME_NUP: &[u8] = include_bytes!("../../sample_game.nup");
 
 pub fn get_asset(raw_path: &str) -> Option<(Vec<u8>, &'static str)> {
     let trimmed = raw_path
@@ -97,5 +98,41 @@ pub fn mime_type(path: &str) -> &'static str {
         "application/json"
     } else {
         "application/octet-stream"
+    }
+}
+
+/// Resolves `"sample_game.nup"` against the working directory or executable ancestor folders,
+/// or extracts the embedded sample container into `%TEMP%\NupExtractor_Sample` so "Try Sample Dump"
+/// works even from a standalone executable without repo files nearby.
+pub fn resolve_sample_nup_path(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if !trimmed.eq_ignore_ascii_case("sample_game.nup") {
+        return raw.to_string();
+    }
+    if PathBuf::from(trimmed).is_file() {
+        return trimmed.to_string();
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        for ancestor in exe.ancestors().skip(1).take(4) {
+            let candidate = ancestor.join("sample_game.nup");
+            if candidate.is_file() {
+                return candidate.to_string_lossy().into_owned();
+            }
+        }
+    }
+    let dir = std::env::temp_dir().join("NupExtractor_Sample");
+    let _ = fs::create_dir_all(&dir);
+    let temp_sample = dir.join("sample_game.nup");
+    let needs_write = match fs::metadata(&temp_sample) {
+        Ok(m) => m.len() != SAMPLE_GAME_NUP.len() as u64,
+        Err(_) => true,
+    };
+    if needs_write {
+        let _ = fs::write(&temp_sample, SAMPLE_GAME_NUP);
+    }
+    if temp_sample.is_file() {
+        temp_sample.to_string_lossy().into_owned()
+    } else {
+        raw.to_string()
     }
 }

@@ -183,3 +183,12 @@ fn test_embedded_static_assets_present() {
 fn test_shell_integration_status_does_not_panic() {
     let _ = nup_extractor_app::shell_integration::is_registered();
 }
+
+#[test]
+fn test_sample_nup_resolution_returns_existing_file() {
+    let resolved = nup_extractor_app::assets::resolve_sample_nup_path("sample_game.nup");
+    assert!(
+        Path::new(&resolved).is_file(),
+        "Expected sample_game.nup to resolve to an existing file, got {resolved}"
+    );
+}
