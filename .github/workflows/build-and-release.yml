@@ -121,6 +121,26 @@ jobs:
         Write-Host "Generated SHA-256 Checksums"
         Get-Content $sumPath
 
+        # Generate clear, end-user release notes (also displayed in the in-app auto-updater)
+        $releaseTag = $env:RELEASE_TAG
+        $notesLines = @(
+            "### What's New in NUP Extractor $releaseTag",
+            '',
+            '- **Drag-and-Drop Extraction:** Drag single or multiple `.nup` files directly onto `NUP_Extractor.exe` or anywhere inside the app window to extract Base games, Updates, and DLCs automatically. Double-clicking `.nup` files still opens the Inspector first.',
+            '- **Liquid Glass Interface & Themes:** Refreshed translucent Acrylic window design with **Dark** and **Light** modes (adjustable anytime in Settings).',
+            '- **Optional Floating Desktop Orb:** Click **Minimize to Orb** or press `Esc` anytime to shrink into an edge-snapped orb that shows live progress on a glowing ring while extracting or packing in the background.',
+            '- **Built-In Packer & Live Timing:** Pack Switch game folders (including Base, Updates, and DLCs) back into compressed `.nup` containers, with remaining ETA and completion time shown for both Extract and Pack.',
+            '- **Smoother Controls:** Click anywhere inside the Extract or Pack dropzones to browse files/folders, cancel or minimize running jobs in either mode, and test **Try Sample Dump** right out of the box.',
+            '- **Faster, Lighter Standalone App:** Single ~5.5 MB executable with no extra runtimes required. Existing `v1.0.8+` users can update cleanly in-place from inside the app with automatic SHA-256 verification.',
+            '',
+            '### Downloads',
+            '- **`NUP_Extractor.exe`** — Portable standalone Windows x64 executable (recommended)',
+            '- **`NUP_Extractor-windows-x64.zip`** — Zip archive containing `NUP_Extractor.exe`, `README.md`, and `LICENSE`',
+            '- **`SHA256SUMS.txt`** — SHA-256 checksums for verification'
+        )
+        $notesPath = Join-Path (Get-Location) "release_assets/RELEASE_NOTES.md"
+        [System.IO.File]::WriteAllLines($notesPath, $notesLines, [System.Text.UTF8Encoding]::new($false))
+
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -132,10 +152,11 @@ jobs:
       with:
         tag_name: ${{ env.RELEASE_TAG }}
         name: NUP Extractor ${{ env.RELEASE_TAG }}
+        body_path: release_assets/RELEASE_NOTES.md
         files: |
           release_assets/NUP_Extractor.exe
           release_assets/NUP_Extractor-windows-x64.zip
           release_assets/SHA256SUMS.txt
         draft: false
         prerelease: false
-        generate_release_notes: true
+        generate_release_notes: false

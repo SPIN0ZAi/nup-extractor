@@ -5,11 +5,11 @@
 </p>
 
 <p align="center">
-  <strong>A high-performance native desktop tool for inspecting, browsing, verifying, and extracting Nintendo Switch 1 & 2 clean-room <code>.nup</code> container archives.</strong>
+  <strong>A fast, portable Windows desktop utility to inspect, verify, pack, and extract Nintendo Switch 1 &amp; 2 clean-room <code>.nup</code> container archives.</strong>
 </p>
 
 <p align="center">
-  🌐 <strong>Official Showcase &amp; Live Web Page:</strong> <a href="https://spin0zai.github.io/nup-extractor/"><strong>spin0zai.github.io/nup-extractor</strong></a>
+  🌐 <strong>Official Showcase &amp; Project Website:</strong> <a href="https://spin0zai.github.io/nup-extractor/"><strong>spin0zai.github.io/nup-extractor</strong></a>
 </p>
 
 <p align="center">
@@ -28,86 +28,65 @@
 ## 📸 Screenshots
 
 <p align="center">
-  <img src="pictures/extractor-main-UI.png" alt="NUP Extractor Main UI" width="95%">
+  <img src="pictures/liquid-glass-expanded.png" alt="NUP Extractor Liquid Glass Workspace" width="95%">
   <br>
-  <em>Container Workspace — Embedded game artwork, metadata, Title/Build IDs, multi-package tabs, interactive file tree, and extraction controls.</em>
+  <em>Liquid Glass Workspace — Game icon, Title/Build IDs, Base/Update/DLC tabs, interactive file tree, and extraction controls.</em>
 </p>
 
 <br>
 
 <p align="center">
-  <img src="pictures/main-UI.png" alt="Welcome Dropzone" width="48%">
+  <img src="pictures/liquid-glass-extract-modal.png" alt="Live Extraction Progress and Logs" width="48%">
   &nbsp;&nbsp;
-  <img src="pictures/extractor-progress-UI.png" alt="Extraction Progress" width="48%">
+  <img src="pictures/orb-morph-demo.gif" alt="Floating Desktop Orb Morph" width="48%">
 </p>
 <p align="center">
-  <em>Left: Initial welcome dropzone screen &bull; Right: High-speed extraction modal with live progress & activity log.</em>
+  <em>Left: Live progress modal with ETA countdown &amp; logs &bull; Right: Optional Floating Orb mode with edge snapping &amp; background progress ring.</em>
 </p>
 
 ---
 
-## ⚡ Overview
+## ✨ What You Get
 
-**NUP Extractor** is a standalone 64-bit Windows GUI utility built to handle **NX Package (`.nup`)** containers—a modern clean-room specification designed by [a55uka](https://github.com/a55uka/nup) for archiving unencrypted Nintendo Switch (1 and 2) game dumps.
-
-Rather than relying on console scripts or heavy web runtimes, NUP Extractor is engineered as a **lightweight, zero-dependency native Windows desktop application** featuring:
-- **Zero Command Prompt Window**: Launches directly into a sleek Liquid Glass desktop window, with optional **Floating Orb** minimize-to-edge mode.
-- **Zero UI Freezing ("Not Responding")**: Employs 64-bit memory-mapped / streaming I/O and background worker threads, keeping the UI smooth at 60+ FPS even when extracting or packing large game dumps.
-- **High-Throughput Zstandard Pipeline**: Streaming Zstandard compression and decompression with adaptive buffered I/O, live ETA, and elapsed duration tracking.
-- **Drag-and-Drop Extraction**: Drop single or multiple `.nup` files directly onto `NUP_Extractor.exe` or the app dropzone for immediate extraction (Base, Updates, and DLCs), or double-click registered `.nup` files to inspect them first.
-- **In-Memory IPC (No Localhost / Sockets)**: Zero network ports, zero socket binding, and no Windows Firewall alerts.
-
----
-
-## ✨ Features
-
-- **🎨 Modern Switch Glassmorphic UI**: High-contrast obsidian theme with iconic Nintendo Joy-Con neon red and cyan accents, collapsible folder tree, and animated progress gauges.
-- **🖼️ Rich Embedded Metadata**: Displays game icons (PNG/JPEG), Title Name, Publisher, Display Version, Title ID, and Build ID (NSO ModuleId) with 1-click clipboard copy buttons.
-- **📦 Multi-Package Support**: Inspects all packages bundled inside the container:
-  - **Base Game** (`base/`)
-  - **Updates & Patches** (`updates/<version>/`)
-  - **DLC & Add-ons** (`dlc/<title_id>/<index>/`)
-- **📂 Interactive File Explorer**:
-  - Live directory tree navigation with file counters and size badges.
-  - Per-file compression codec badges (**RAW** vs **Zstd**) and compression ratio stats.
-  - Sub-millisecond instant search across thousands of files.
-- **⚡ Flexible Extraction Engine**:
-  - **Full Game Dump**: Reconstructs the complete game directory hierarchy.
-  - **Package Mode**: Extracts only the selected package tab.
-  - **Subtree Mode**: Extracts specific folders (e.g. only `romfs/` or `exefs/`).
-  - Native Windows File Explorer folder pickers with auto-open upon completion.
-- **🛡️ Integrity Verification**:
-  - Validates Superblock structure and Table of Contents (TOC) SHA-256 hash.
-  - Deep-verifies individual SHA-256 checksums across every file extent.
+- **🖱️ Drag-and-Drop Batch Extraction**:
+  - Drag one or multiple `.nup` files directly onto `NUP_Extractor.exe` or anywhere inside the app window to extract **Base games, Updates, and DLCs** automatically.
+  - Click anywhere inside the Extract or Pack dropzones to open Windows Explorer, or use the **Try Sample Dump** button anytime to test features right out of the box.
+  - Double-click registered `.nup` files in Windows Explorer to open the Container Inspector first.
+- **📦 Built-In Multi-Package Packer**:
+  - Switch between **Extract** and **Pack** modes to package game folders (including Base, Updates, and DLCs) back into clean `.nup` containers.
+  - Choose between **Zstd Fast** (balanced), **Zstd Ultra** (maximum savings), or **RAW** (uncompressed).
+- **🪟 Liquid Glass UI & Optional Floating Orb**:
+  - Windows Acrylic translucent design with **Dark** and **Light** Glass themes selectable in Settings.
+  - Click **Minimize to Orb** (or press `Esc`) anytime—even mid-extraction or mid-pack—to dock into a compact circular orb on your screen edge with a live progress ring.
+- **🖼️ Complete Metadata & Interactive Tree Explorer**:
+  - Displays game artwork, Title Name, Publisher, Version, Title ID, and Build ID with one-click copy buttons.
+  - Browse Base, Update, and DLC tabs, search thousands of files instantly, inspect RAW vs Zstd compression stats, or right-click any single file to extract it individually.
+- **⏱️ Live ETA, Speed & Time Spent**:
+  - Real-time MB/s throughput, estimated remaining time, total elapsed time on completion, disk-space pre-checks, and instant **Cancel** or **Minimize to Orb** controls in both Extract and Pack modals.
+- **🛡️ Deep Integrity Verification**:
+  - Validates Superblock headers, Table of Contents SHA-256 checksums, and per-file SHA-256 hashes.
 - **🔄 In-Place Auto-Updater**:
-  - Automatic background checks on startup or on-demand via the **Updates** button.
-  - User controls: **Update Now**, **Remind Me Later**, or **Skip This Version**.
-  - High-speed streaming download with live MB/s progress telemetry and SHA-256 verification.
-  - Seamless in-place replacement and automatic restart without leaving behind temporary files or modifying install directories.
-- **✨ Liquid Glass & Floating Orb Mode**:
-  - Windows Acrylic / Mica glass backdrop with Dark and Light themes.
-  - Optional minimize-to-orb edge snapping with live circular progress ring during extraction, verification, and packing.
+  - Checks GitHub Releases cleanly in the background or on-demand, shows clear end-user highlights, verifies SHA-256 checksums, and upgrades `NUP_Extractor.exe` in place without losing settings.
 
 ---
 
-## 🚀 Download & Installation
+## 🚀 Download & Quick Start
 
-### Option 1: Direct Download (Recommended)
-Download the latest pre-compiled standalone executable from the [Releases](https://github.com/SPIN0ZAi/nup-extractor/releases/latest) page:
+### Option 1: Portable Windows Download (Recommended)
+Download from the [GitHub Releases](https://github.com/SPIN0ZAi/nup-extractor/releases/latest) page:
 
-1. Download **`NUP_Extractor-windows-x64.zip`** (or standalone **`NUP_Extractor.exe`**).
-2. Extract the ZIP anywhere (e.g. Desktop).
-3. Double-click **`NUP_Extractor.exe`** to run, or drag & drop `.nup` files directly onto **`NUP_Extractor.exe`** to extract Base, Updates, and DLCs automatically.
+1. Download **`NUP_Extractor.exe`** (or **`NUP_Extractor-windows-x64.zip`**).
+2. Double-click **`NUP_Extractor.exe`** to open the app—or drag &amp; drop `.nup` files directly onto **`NUP_Extractor.exe`** to extract them automatically into `<filename>_extracted`.
 
-*(Single self-contained executable — no external runtime SDKs required!)*
+*(Single ~5.5 MB executable—zero installation and zero external runtimes required!)*
 
-### CLI Quick Usage
+### Option 2: Command-Line Usage
 ```powershell
-# Headless extraction (extracts Base, Updates, and DLCs into <dest_dir>)
+# Extract all packages (Base, Updates, & DLCs) directly into a destination folder
 NUP_Extractor.exe "C:\Games\MyGame.nup" "D:\Extracted\MyGame"
 
-# Batch extract multiple .nup files next to their source folders
-NUP_Extractor.exe --extract "C:\Games\Base.nup" "C:\Games\Update.nup"
+# Batch extract multiple .nup files next to each source file
+NUP_Extractor.exe --extract "C:\Games\Base.nup" "C:\Games\Update.nup" "C:\Games\DLC.nup"
 ```
 
 ---
@@ -116,80 +95,66 @@ NUP_Extractor.exe --extract "C:\Games\Base.nup" "C:\Games\Update.nup"
 
 ### Prerequisites
 - Windows 10 / 11 (64-bit)
-- Native build toolchain (`cargo` / MSVC Build Tools)
-- *(Optional)* [.NET 10 SDK](https://dotnet.microsoft.com/download) for running the legacy parity suite
+- Cargo / MSVC Build Tools
+- *(Optional)* [.NET 10 SDK](https://dotnet.microsoft.com/download) for running the legacy parity test suite
 
-### 1. Clone the Repository
+### Build & Test Commands
 ```powershell
 git clone https://github.com/SPIN0ZAi/nup-extractor.git
 cd nup-extractor
-```
 
-### 2. Run Automated Tests
-```powershell
+# Format check, linter, and all automated workspace tests
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-```
 
-### 3. Build & Publish Standalone Executable
-You can run the one-click build script:
-```powershell
+# Optional legacy parity test suite
+dotnet test legacy_dotnet/NupExtractor.slnx -c Release
+
+# One-click release build (outputs NUP_Extractor.exe)
 .\build_native.bat
 ```
 
-Or build directly with Cargo:
-```powershell
-cargo build --release -p nup-extractor
-```
-
-The resulting standalone `NUP_Extractor.exe` is generated in `target\release\NUP_Extractor.exe` (and copied to the project root by `build_native.bat`).
-
 ---
 
-## 🧪 Automated Test Suite
-
-The workspace includes automated unit, golden-parity, IPC contract, and UI state-machine tests across `crates/` and `app/tests/`, plus legacy parity regression tests in `legacy_dotnet/`:
+## 🧪 Automated Test Coverage
 
 | Suite | Scope |
 | :--- | :--- |
-| `nup-core` unit & parity tests | Superblock/TOC parsing, RAW & Zstd decompression, multi-package Base/Update/DLC packing, SHA-256 verification, inspect/search contracts |
-| `nup-host-logic` unit & golden tests | Floating orb geometry, snap-to-edge positioning, spring morph state machine, persisted settings round-trips |
-| `nup-extractor` integration tests | Startup CLI & drag-and-drop parsing, IPC golden contract replay, embedded static assets, HTTP updater & checksum verification |
-| `legacy_dotnet` xUnit suite | Legacy container format parity verification |
+| `nup-core` unit, parity & golden tests | Superblock/TOC validation, RAW & Zstd decompression, multi-package Base/Update/DLC packing, SHA-256 verification, inspect/search/tree contracts |
+| `nup-host-logic` unit & golden tests | Floating orb geometry, snap-to-edge positioning, morph state machine, persisted settings round-trips |
+| `nup-extractor` integration & unit tests | CLI & drag-and-drop parsing, IPC contract golden replay, embedded sample resolution, updater & SHA-256 verification |
+| `legacy_dotnet` xUnit parity suite | Historical format compatibility verification |
 
 ---
 
-## 👥 Engineering & Contributing
-
-To maintain high engineering standards, all development follows a Kanban board and Git Flow:
-- **Git Flow Guide**: See [docs/WORKFLOW.md](docs/WORKFLOW.md) for branch naming, PR checklist, and release cycles.
-- **Kanban Board**: Tasks and bugs are tracked via [GitHub Projects](https://github.com/SPIN0ZAi/nup-extractor/projects).
-- **Automated CI**: Pull Requests targeting `develop` or `main` are automatically linted, built, packaged, and verified across all test suites before merging.
-
----
-
-## 🏛️ Architecture
+## 🏛️ Project Structure
 
 ```
 nup-extractor/
-├── app/                           # Native Desktop Host, WebView2 UI Bridge, Updater & CLI
+├── app/                           # Desktop window host, WebView2 IPC bridge, updater & CLI
 ├── crates/
 │   ├── nup-core/                  # Clean-room NUP parser, Zstd streaming engine & packer
-│   └── nup-host-logic/            # Floating orb geometry, snap-to-edge & animation state machine
-├── static/                        # Embedded UI Assets (HTML5, CSS3 Liquid Glass, JS)
-│   ├── index.html                 # Responsive workspace & Floating Orb layout
-│   ├── styles.css                 # Liquid Glass styling, dark/light themes & animations
-│   ├── ipc.js                     # In-process WebView2 message transport
-│   └── app.js                     # IPC event handling, batch drop queue & UI controller
-├── tests_golden/                  # IPC & host logic contract fixtures
-├── legacy_dotnet/                 # Archived C# .NET reference implementation & xUnit parity suite
-├── pictures/                      # Screenshots showcase
-├── docs/                          # Format & UI specifications (SPEC.md, WORKFLOW.md, ORB_MODE.md)
-├── .github/workflows/             # GitHub Actions CI & automated release pipelines
+│   └── nup-host-logic/            # Floating orb geometry, edge snapping & morph state machine
+├── static/                        # Embedded UI assets (Liquid Glass HTML/CSS/JS)
+├── website/                       # GitHub Pages showcase site
+├── pictures/                      # Screenshots and animations
+├── tests_golden/                  # IPC, engine & orb contract fixtures
+├── legacy_dotnet/                 # Archived C# reference & parity test suite
+├── docs/                          # Container specification (SPEC.md, WORKFLOW.md, ORB_MODE.md)
+├── .github/workflows/             # CI, GitHub Pages deploy & automated release pipelines
 ├── Cargo.toml                     # Workspace manifest
-├── build_native.bat               # 1-Click Build & Test script
+├── build_native.bat               # 1-Click local build & verification script
 ├── LICENSE                        # MIT License
 └── README.md                      # Project documentation
 ```
+
+---
+
+## 👥 Contributing
+
+- **Git Flow Guide**: See [docs/WORKFLOW.md](docs/WORKFLOW.md) for branch naming, PR checklist, and release cycles.
+- **Automated CI**: Every Pull Request targeting `develop` or `main` runs `cargo fmt`, `cargo clippy`, `cargo test --workspace`, and legacy parity tests automatically before merging.
 
 ---
 
@@ -197,4 +162,4 @@ nup-extractor/
 
 - **Software License**: Distributed under the [MIT License](LICENSE).
 - **Format Specification**: NUP format specification by [a55uka](https://github.com/a55uka/nup) (MIT License).
-- **Disclaimer**: This is a clean-room interoperability archive extraction tool. It does **not** contain cryptographic keys (`prod.keys`), proprietary Nintendo code, or copyrighted game files. All game dumps must be legally acquired and unencrypted before use.
+- **Disclaimer**: This is a clean-room interoperability archive extraction utility. It does **not** contain cryptographic keys (`prod.keys`), proprietary Nintendo code, or copyrighted game files. All game dumps must be legally acquired and unencrypted before use.
