@@ -156,6 +156,7 @@ const extractCurrentFile = document.getElementById("extract-current-file");
 const extractLogBox = document.getElementById("extract-log-box");
 const btnModalOpenFolder = document.getElementById("btn-modal-open-folder");
 const btnModalClose = document.getElementById("btn-modal-close");
+const btnExtractCancel = document.getElementById("btn-extract-cancel");
 
 const verifyModal = document.getElementById("verify-modal");
 const btnVerifyContainer = document.getElementById("btn-verify-container");
@@ -223,6 +224,7 @@ const packStatsFiles = document.getElementById("pack-stats-files");
 const packStatsBytes = document.getElementById("pack-stats-bytes");
 const packLogBox = document.getElementById("pack-log-box");
 const btnPackModalOpenFolder = document.getElementById("btn-pack-modal-open-folder");
+const btnPackCollapseBg = document.getElementById("btn-pack-collapse-bg");
 const btnPackModalCancel = document.getElementById("btn-pack-modal-cancel");
 const btnPackModalClose = document.getElementById("btn-pack-modal-close");
 
@@ -287,6 +289,15 @@ function setupEventListeners() {
     });
 
     // Modal buttons
+    if (btnExtractCancel) {
+        btnExtractCancel.addEventListener("click", () => {
+            batchExtractQueue = null;
+            postNativeAction("cancel_extract");
+            extractModal.classList.remove("active");
+            resetOrbTask();
+            showToast("Extraction cancelled.");
+        });
+    }
     btnModalClose.addEventListener("click", () => {
         extractModal.classList.remove("active");
     });
@@ -311,7 +322,11 @@ function setupEventListeners() {
         renderTree();
     });
 
-    // Drag and drop events on dropzone
+    // Click anywhere on dropzone box (outside action buttons/kbd) & drag-drop events
+    dropzoneView.addEventListener("click", (e) => {
+        if (e.target.closest("button, a, input, select, kbd")) return;
+        browseNativeFile();
+    });
     dropzoneView.addEventListener("dragover", (e) => {
         e.preventDefault();
         dropzoneView.classList.add("dragover");
@@ -321,8 +336,9 @@ function setupEventListeners() {
     });
     dropzoneView.addEventListener("drop", (e) => {
         e.preventDefault();
+        e.stopPropagation();
         dropzoneView.classList.remove("dragover");
-        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
             if (isNative && hostBridge.postMessageWithFiles(
                 { action: "orb_file_drop", target: "dropzone" },
                 e.dataTransfer.files
@@ -335,6 +351,25 @@ function setupEventListeners() {
             } else {
                 browseNativeFile();
             }
+        }
+    });
+
+    // Global document drop fallback (ensures WebView2 never navigates on drops anywhere in the window)
+    document.addEventListener("dragover", (e) => {
+        e.preventDefault();
+    });
+    document.addEventListener("drop", (e) => {
+        e.preventDefault();
+        if (
+            (extractModal && extractModal.classList.contains("active")) ||
+            (packModal && packModal.classList.contains("active")) ||
+            (verifyModal && verifyModal.classList.contains("active"))
+        ) {
+            return;
+        }
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0 && isNative) {
+            const target = activeAppMode === "pack" ? "pack" : "dropzone";
+            hostBridge.postMessageWithFiles({ action: "orb_file_drop", target }, e.dataTransfer.files);
         }
     });
 
@@ -499,6 +534,10 @@ function setupEventListeners() {
 
     // Pack Dropzone Events
     if (packDropzone) {
+        packDropzone.addEventListener("click", (e) => {
+            if (e.target.closest("button, a, input, select")) return;
+            browsePackSourceFolder();
+        });
         packDropzone.addEventListener("dragover", (e) => {
             e.preventDefault();
             packDropzone.classList.add("dragover");
@@ -508,8 +547,9 @@ function setupEventListeners() {
         });
         packDropzone.addEventListener("drop", (e) => {
             e.preventDefault();
+            e.stopPropagation();
             packDropzone.classList.remove("dragover");
-            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
                 if (isNative && hostBridge.postMessageWithFiles(
                     { action: "orb_file_drop", target: "pack" },
                     e.dataTransfer.files
@@ -525,12 +565,15 @@ function setupEventListeners() {
     }
 
     // Pack Modal Buttons
+    if (btnPackCollapseBg) {
+        btnPackCollapseBg.addEventListener("click", () => requestOrbCollapse());
+    }
     if (btnPackModalCancel) {
         btnPackModalCancel.addEventListener("click", () => {
-            if (isNative) {
-                nativeCall("cancel_pack").catch(() => {});
-            }
+            postNativeAction("cancel_pack");
             packModal.classList.remove("active");
+            resetOrbTask();
+            showToast("Packaging cancelled.");
         });
     }
 
@@ -746,6 +789,7 @@ async function startPackaging() {
     if (packLogBox) packLogBox.innerHTML = "";
     if (btnPackModalOpenFolder) btnPackModalOpenFolder.style.display = "none";
     if (btnPackModalClose) btnPackModalClose.style.display = "none";
+    if (btnPackCollapseBg) btnPackCollapseBg.style.display = "inline-flex";
     if (btnPackModalCancel) btnPackModalCancel.style.display = "inline-flex";
 
     if (packModal) packModal.classList.add("active");
@@ -830,6 +874,7 @@ function onPackDone(msg) {
 
     if (btnPackModalOpenFolder) btnPackModalOpenFolder.style.display = "inline-flex";
     if (btnPackModalClose) btnPackModalClose.style.display = "inline-flex";
+    if (btnPackCollapseBg) btnPackCollapseBg.style.display = "none";
     if (btnPackModalCancel) btnPackModalCancel.style.display = "none";
 
     if (packLogBox) {
@@ -843,6 +888,7 @@ function onPackDone(msg) {
 function onPackError(msg) {
     if (packCurrentFile) packCurrentFile.textContent = "Packaging Error: " + (msg.error || "Unknown error");
     if (btnPackModalClose) btnPackModalClose.style.display = "inline-flex";
+    if (btnPackCollapseBg) btnPackCollapseBg.style.display = "none";
     if (btnPackModalCancel) btnPackModalCancel.style.display = "none";
     if (packLogBox) {
         addLogEntry(packLogBox, "ERROR: " + (msg.error || "Packaging failed"), "error");
@@ -1323,6 +1369,8 @@ function startBatchExtraction(files) {
     extractStatsBytes.textContent = "0 B / 0 B";
     extractCurrentFile.textContent = "Starting high-speed extraction...";
     extractLogBox.innerHTML = "";
+    if (btnExtractCollapseBg) btnExtractCollapseBg.style.display = "inline-flex";
+    if (btnExtractCancel) btnExtractCancel.style.display = "inline-flex";
     btnModalOpenFolder.style.display = "none";
     btnModalClose.style.display = "none";
     extractModal.classList.add("active");
@@ -1421,6 +1469,8 @@ function finishBatchStep(succeeded, detailText, destDir) {
     if (ok > 0) {
         btnModalOpenFolder.style.display = "inline-flex";
     }
+    if (btnExtractCollapseBg) btnExtractCollapseBg.style.display = "none";
+    if (btnExtractCancel) btnExtractCancel.style.display = "none";
     btnModalClose.style.display = "inline-flex";
     return true;
 }
@@ -1490,6 +1540,8 @@ async function executeExtraction(nupPath, dest, mode, openWhenDone) {
     extractStatsBytes.textContent = "0 B / 0 B";
     extractCurrentFile.textContent = "Starting high-speed extraction...";
     extractLogBox.innerHTML = "";
+    if (btnExtractCollapseBg) btnExtractCollapseBg.style.display = "inline-flex";
+    if (btnExtractCancel) btnExtractCancel.style.display = "inline-flex";
     btnModalOpenFolder.style.display = "none";
     btnModalClose.style.display = "none";
     extractModal.classList.add("active");
@@ -1602,6 +1654,8 @@ function onExtractDone(msg) {
     extractCurrentFile.textContent = `✓ Extraction completed in ${timeSpent}!`;
     extractStatsFiles.textContent = `Extracted all files • Took ${timeSpent}`;
     addLogEntry(extractLogBox, `✓ Completed in ${timeSpent}. All files extracted to: ${dest}`, "success");
+    if (btnExtractCollapseBg) btnExtractCollapseBg.style.display = "none";
+    if (btnExtractCancel) btnExtractCancel.style.display = "none";
     btnModalOpenFolder.style.display = "inline-flex";
     btnModalClose.style.display = "inline-flex";
     completeOrbTask("extract");
@@ -1616,6 +1670,8 @@ function onExtractError(msg) {
 
     extractCurrentFile.textContent = `✕ Extraction error: ${errText}`;
     addLogEntry(extractLogBox, `[ERROR] ${errText}`, "error");
+    if (btnExtractCollapseBg) btnExtractCollapseBg.style.display = "none";
+    if (btnExtractCancel) btnExtractCancel.style.display = "none";
     btnModalClose.style.display = "inline-flex";
     resetOrbTask();
 }
@@ -2380,6 +2436,7 @@ function initFloatingOrbUi() {
         });
         orbButton.addEventListener("drop", (e) => {
             e.preventDefault();
+            e.stopPropagation();
             orbButton.classList.remove("dragover");
             if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
                 if (isNative && hostBridge.postMessageWithFiles(

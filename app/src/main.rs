@@ -394,7 +394,10 @@ fn main() {
                 None,
                 |p| {
                     if p.status == "extracting" {
-                        write_stdout(&format!("PROGRESS: {}/{} - {}", p.current, p.total, p.file_name));
+                        write_stdout(&format!(
+                            "PROGRESS: {}/{} - {}",
+                            p.current, p.total, p.file_name
+                        ));
                     }
                 },
                 &cancel,

@@ -17,7 +17,8 @@ use tao::platform::windows::WindowExtWindows;
 use tao::window::WindowBuilder;
 use webview2_com::Microsoft::Web::WebView2::Win32::{
     COREWEBVIEW2_COLOR, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL, ICoreWebView2, ICoreWebView2_2,
-    ICoreWebView2Controller2, ICoreWebView2File, ICoreWebView2WebMessageReceivedEventArgs2,
+    ICoreWebView2Controller2, ICoreWebView2Controller4, ICoreWebView2File,
+    ICoreWebView2WebMessageReceivedEventArgs2,
 };
 use webview2_com::{
     NavigationCompletedEventHandler, WebMessageReceivedEventHandler,
@@ -933,7 +934,6 @@ pub fn run_app(
         .with_transparent(true)
         .with_background_color((0, 0, 0, 0))
         .with_devtools(true)
-        .with_drag_drop_handler(|_| false) // Allow DOM drag/drop + WebView2 AdditionalObjects!
         .with_url("about:blank")
         .build(&window)
         .map_err(|e| format!("Failed to initialize WebView2: {e}"))?;
@@ -948,6 +948,11 @@ pub fn run_app(
                 G: 0,
                 B: 0,
             });
+        }
+    }
+    if let Ok(c4) = controller.cast::<ICoreWebView2Controller4>() {
+        unsafe {
+            let _ = c4.SetAllowExternalDrop(true);
         }
     }
     let core_webview = unsafe { controller.CoreWebView2() }
