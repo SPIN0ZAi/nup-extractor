@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none';">
     <title>NUP Extractor · Switch Clean-Room Container Utility</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -210,7 +211,7 @@
                                         <div class="spec-label">Title ID</div>
                                         <div class="spec-value">
                                             <span id="spec-title-id">0100000000000000</span>
-                                            <button class="copy-btn" onclick="copyText('spec-title-id')" title="Copy Title ID">
+                                            <button class="copy-btn" data-copy-target="spec-title-id" title="Copy Title ID">
                                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                                             </button>
                                         </div>
@@ -220,7 +221,7 @@
                                         <div class="spec-label">Build ID (NSO ModuleId)</div>
                                         <div class="spec-value">
                                             <span id="spec-build-id" style="font-size: 0.75rem; text-overflow: ellipsis; overflow: hidden; max-width: 150px;">-</span>
-                                            <button class="copy-btn" onclick="copyText('spec-build-id')" title="Copy Build ID">
+                                            <button class="copy-btn" data-copy-target="spec-build-id" title="Copy Build ID">
                                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                                             </button>
                                         </div>

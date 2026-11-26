@@ -68,6 +68,25 @@ pub trait IpcSink: Send + Sync + 'static {
     fn dispatch_window(&self, cmd: WindowCommand);
 }
 
+#[derive(Debug, Clone)]
+struct CachedUpdateTarget {
+    download_url: String,
+    checksum_url: Option<String>,
+}
+
+fn cache_update_result(slot: &Mutex<Option<CachedUpdateTarget>>, res: &updater::UpdateCheckResult) {
+    if let Ok(mut guard) = slot.lock() {
+        if res.error.is_none() && res.update_available && !res.download_url.trim().is_empty() {
+            *guard = Some(CachedUpdateTarget {
+                download_url: res.download_url.clone(),
+                checksum_url: res.checksum_url.clone(),
+            });
+        } else {
+            *guard = None;
+        }
+    }
+}
+
 pub struct IpcRouter {
     sink: Arc<dyn IpcSink>,
     initial_file_path: Option<String>,
@@ -76,7 +95,7 @@ pub struct IpcRouter {
     verify_cancel: Mutex<Arc<AtomicBool>>,
     pack_cancel: Mutex<Arc<AtomicBool>>,
     update_cancel: Mutex<Arc<AtomicBool>>,
-    last_checksum_url: Arc<Mutex<Option<String>>>,
+    cached_update: Arc<Mutex<Option<CachedUpdateTarget>>>,
 }
 
 impl IpcRouter {
@@ -93,7 +112,7 @@ impl IpcRouter {
             verify_cancel: Mutex::new(Arc::new(AtomicBool::new(false))),
             pack_cancel: Mutex::new(Arc::new(AtomicBool::new(false))),
             update_cancel: Mutex::new(Arc::new(AtomicBool::new(false))),
-            last_checksum_url: Arc::new(Mutex::new(None)),
+            cached_update: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -676,14 +695,12 @@ impl IpcRouter {
             "check_update" => {
                 let manual = get_bool(&root, &["manual"]).unwrap_or(false);
                 let sink = Arc::clone(&self.sink);
-                let checksum_cache = Arc::clone(&self.last_checksum_url);
+                let update_cache = Arc::clone(&self.cached_update);
                 if spawn_bg {
                     let sink_c = Arc::clone(&sink);
                     std::thread::spawn(move || {
                         let res = updater::check_for_updates();
-                        if let Ok(mut g) = checksum_cache.lock() {
-                            *g = res.checksum_url.clone();
-                        }
+                        cache_update_result(&update_cache, &res);
                         let success = res.error.is_none();
                         sink_c.send_json(json!({
                             "id": id,
@@ -696,9 +713,7 @@ impl IpcRouter {
                     });
                 } else {
                     let res = updater::check_for_updates();
-                    if let Ok(mut g) = checksum_cache.lock() {
-                        *g = res.checksum_url.clone();
-                    }
+                    cache_update_result(&update_cache, &res);
                     let success = res.error.is_none();
                     sink.send_json(json!({
                         "id": id,
@@ -711,14 +726,20 @@ impl IpcRouter {
                 }
             }
             "start_update" => {
-                let download_url =
-                    get_str(&root, &["downloadUrl", "download_url"]).unwrap_or_default();
-                let checksum_url = get_str(&root, &["checksumUrl", "checksum_url"])
-                    .or_else(|| self.last_checksum_url.lock().ok().and_then(|g| g.clone()));
-                if download_url.trim().is_empty() {
+                // Always ignore JS-supplied downloadUrl / checksumUrl; only execute updates
+                // cached by a prior Rust-side `check_update` response.
+                let cached = self.cached_update.lock().ok().and_then(|g| g.clone());
+                let Some(target) = cached else {
                     self.sink.send_json(json!({
                         "type": "update_error",
-                        "error": "No valid download URL provided for update."
+                        "error": "No checked update is available. Please check for updates first."
+                    }));
+                    return;
+                };
+                if target.download_url.trim().is_empty() {
+                    self.sink.send_json(json!({
+                        "type": "update_error",
+                        "error": "No valid download URL cached for update."
                     }));
                     return;
                 }
@@ -726,8 +747,8 @@ impl IpcRouter {
                 let sink = Arc::clone(&self.sink);
                 let run = move || {
                     let res = updater::apply_update_and_restart(
-                        &download_url,
-                        checksum_url.as_deref(),
+                        &target.download_url,
+                        target.checksum_url.as_deref(),
                         |info| {
                             sink.send_json(json!({
                                 "type": "update_progress",
@@ -908,4 +929,124 @@ fn get_bool(root: &Value, keys: &[&str]) -> Option<bool> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{BufRead, BufReader, Write};
+    use std::net::TcpListener;
+
+    struct VecSink {
+        messages: Mutex<Vec<Value>>,
+    }
+
+    impl VecSink {
+        fn new() -> Self {
+            Self {
+                messages: Mutex::new(Vec::new()),
+            }
+        }
+    }
+
+    impl IpcSink for VecSink {
+        fn send_json(&self, value: Value) {
+            self.messages.lock().unwrap().push(value);
+        }
+        fn dispatch_window(&self, _cmd: WindowCommand) {}
+    }
+
+    #[test]
+    fn start_update_refuses_without_cached_check() {
+        let sink = Arc::new(VecSink::new());
+        let router = IpcRouter::new(Arc::clone(&sink) as Arc<dyn IpcSink>, None, Vec::new());
+
+        // Even with attacker-supplied URLs in JS payload, start_update must refuse
+        // because check_update has not cached an update target.
+        let payload = json!({
+            "action": "start_update",
+            "downloadUrl": "http://127.0.0.1:9/evil.zip",
+            "checksumUrl": "http://127.0.0.1:9/SHA256SUMS.txt"
+        });
+        router.handle_message_sync(&payload.to_string(), Vec::new());
+
+        let msgs = sink.messages.lock().unwrap();
+        assert_eq!(msgs.len(), 1);
+        assert_eq!(msgs[0]["type"], "update_error");
+        assert!(
+            msgs[0]["error"]
+                .as_str()
+                .unwrap()
+                .contains("No checked update"),
+            "unexpected error: {:?}",
+            msgs[0]
+        );
+    }
+
+    #[test]
+    fn start_update_ignores_js_urls_and_uses_cached_urls_only() {
+        // Two local listeners: attacker (must never be contacted) and cached (used by updater).
+        let attacker_listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let attacker_addr = attacker_listener.local_addr().unwrap();
+        let attacker_hit = Arc::new(AtomicBool::new(false));
+        let attacker_hit_c = Arc::clone(&attacker_hit);
+        attacker_listener.set_nonblocking(true).unwrap();
+
+        let cached_listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let cached_addr = cached_listener.local_addr().unwrap();
+        let cached_hit = Arc::new(AtomicBool::new(false));
+        let cached_hit_c = Arc::clone(&cached_hit);
+        let srv = std::thread::spawn(move || {
+            if let Ok((mut stream, _)) = cached_listener.accept() {
+                cached_hit_c.store(true, Ordering::SeqCst);
+                let mut br = BufReader::new(&mut stream);
+                let mut line = String::new();
+                let _ = br.read_line(&mut line);
+                let _ = write!(
+                    stream,
+                    "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                );
+                let _ = stream.flush();
+            }
+        });
+
+        let sink = Arc::new(VecSink::new());
+        let router = IpcRouter::new(Arc::clone(&sink) as Arc<dyn IpcSink>, None, Vec::new());
+
+        let check_res = updater::UpdateCheckResult {
+            update_available: true,
+            current_version: "1.0.0".into(),
+            latest_version: "9.9.9".into(),
+            release_name: "v9.9.9".into(),
+            release_notes: String::new(),
+            release_url: String::new(),
+            download_url: format!("http://{cached_addr}/good.zip"),
+            checksum_url: Some(format!("http://{cached_addr}/SHA256SUMS.txt")),
+            asset_name: "good.zip".into(),
+            download_size: 100,
+            error: None,
+        };
+        cache_update_result(&router.cached_update, &check_res);
+
+        let payload = json!({
+            "action": "start_update",
+            "downloadUrl": format!("http://{attacker_addr}/evil.zip"),
+            "checksumUrl": format!("http://{attacker_addr}/SHA256SUMS.txt")
+        });
+        router.handle_message_sync(&payload.to_string(), Vec::new());
+
+        if attacker_listener.accept().is_ok() {
+            attacker_hit_c.store(true, Ordering::SeqCst);
+        }
+        let _ = srv.join();
+
+        assert!(
+            !attacker_hit.load(Ordering::SeqCst),
+            "attacker downloadUrl must never be contacted"
+        );
+        assert!(
+            cached_hit.load(Ordering::SeqCst),
+            "cached download_url must be the one contacted"
+        );
+    }
 }
